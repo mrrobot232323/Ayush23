@@ -12,115 +12,118 @@ import {
 } from "react-native";
 import WizardProgress from "../../src/components/WizardProgress";
 import { COLORS, FONT } from "../../src/constants/theme";
+import { useUser } from "../../src/context/UserContext";
 
-// Same categories — unchanged
+/* 🔥 EMOJI ADDED to all vibes */
 const categories = [
     {
         title: "Adventure & Outdoors",
         items: [
-            { id: "adventurer", label: "Adventurer" },
-            { id: "mountain", label: "Mountain Hiker" },
-            { id: "camper", label: "Nature Camper" },
-            { id: "thrill", label: "Thrill Seeker" },
-            { id: "trail", label: "Trail Rider" },
-            { id: "volcano", label: "Volcano Chaser" },
+            { id: "adventurer", label: "Adventurer", emoji: "🧗‍♂️" },
+            { id: "mountain", label: "Mountain Hiker", emoji: "🥾" },
+            { id: "camper", label: "Nature Camper", emoji: "🏕️" },
+            { id: "thrill", label: "Thrill Seeker", emoji: "🎢" },
+            { id: "trail", label: "Trail Rider", emoji: "🚵‍♂️" },
+            { id: "volcano", label: "Volcano Chaser", emoji: "🌋" },
         ]
     },
     {
         title: "Beach & Chill",
         items: [
-            { id: "chill", label: "Chill & Relax" },
-            { id: "island", label: "Island Hopper" },
-            { id: "sun", label: "Sun Chaser" },
-            { id: "waves", label: "Wave Lover" },
-            { id: "zen", label: "Zen Mode" },
+            { id: "chill", label: "Chill & Relax", emoji: "😌" },
+            { id: "island", label: "Island Hopper", emoji: "🏝️" },
+            { id: "sun", label: "Sun Chaser", emoji: "☀️" },
+            { id: "waves", label: "Wave Lover", emoji: "🌊" },
+            { id: "zen", label: "Zen Mode", emoji: "🧘‍♂️" },
         ]
     },
     {
         title: "Food & Culture",
         items: [
-            { id: "foodie", label: "Foodie" },
-            { id: "wine", label: "Wine Explorer" },
-            { id: "sushi", label: "Sushi Lover" },
-            { id: "cheese", label: "Cheese Addict" },
-            { id: "cultural", label: "Cultural Explorer" },
-            { id: "museum", label: "Museum Lover" },
+            { id: "foodie", label: "Foodie", emoji: "🍽️" },
+            { id: "wine", label: "Wine Explorer", emoji: "🍷" },
+            { id: "sushi", label: "Sushi Lover", emoji: "🍣" },
+            { id: "cheese", label: "Cheese Addict", emoji: "🧀" },
+            { id: "cultural", label: "Cultural Explorer", emoji: "🎭" },
+            { id: "museum", label: "Museum Lover", emoji: "🏛️" },
         ]
     },
     {
         title: "Nightlife & Social",
         items: [
-            { id: "party", label: "Party Animal" },
-            { id: "festival", label: "Festival Fan" },
-            { id: "club", label: "Club Vibes" },
-            { id: "casino", label: "Casino Cruiser" },
-            { id: "karaoke", label: "Karaoke Champ" },
+            { id: "party", label: "Party Animal", emoji: "🎉" },
+            { id: "festival", label: "Festival Fan", emoji: "🎶" },
+            { id: "club", label: "Club Vibes", emoji: "🪩" },
+            { id: "casino", label: "Casino Cruiser", emoji: "🎰" },
+            { id: "karaoke", label: "Karaoke Champ", emoji: "🎤" },
         ]
     },
     {
         title: "Luxury & Comfort",
         items: [
-            { id: "luxury", label: "Luxury" },
-            { id: "firstclass", label: "First Class Only" },
-            { id: "boutique", label: "Boutique Hotel Lover" },
-            { id: "spa", label: "Spa & Wellness" },
+            { id: "luxury", label: "Luxury", emoji: "💎" },
+            { id: "firstclass", label: "First Class Only", emoji: "🛫" },
+            { id: "boutique", label: "Boutique Hotel Lover", emoji: "🏨" },
+            { id: "spa", label: "Spa & Wellness", emoji: "💆‍♀️" },
         ]
     },
     {
         title: "Road & Offbeat",
         items: [
-            { id: "vanlife", label: "Van Life Dreamer" },
-            { id: "roadtrip", label: "Road Tripper" },
-            { id: "scenic", label: "Scenic Route Lover" },
-            { id: "highway", label: "Highway Nomad" },
+            { id: "vanlife", label: "Van Life Dreamer", emoji: "🚐" },
+            { id: "roadtrip", label: "Road Tripper", emoji: "🛣️" },
+            { id: "scenic", label: "Scenic Route Lover", emoji: "🌄" },
+            { id: "highway", label: "Highway Nomad", emoji: "🚗" },
         ]
     },
     {
         title: "Seasonal Vibes",
         items: [
-            { id: "snow", label: "Snow Adventurer" },
-            { id: "ski", label: "Ski & Snowboarder" },
-            { id: "winter", label: "Winter Cozy Type" },
+            { id: "snow", label: "Snow Adventurer", emoji: "❄️" },
+            { id: "ski", label: "Ski & Snowboarder", emoji: "🎿" },
+            { id: "winter", label: "Winter Cozy Type", emoji: "☕" },
         ]
     },
     {
         title: "Connection-Oriented",
         items: [
-            { id: "locals", label: "Meet-the-Locals Type" },
-            { id: "love", label: "Travel for Love" },
-            { id: "buddy", label: "Travel Buddy Seeker" },
+            { id: "locals", label: "Meet-the-Locals Type", emoji: "👋" },
+            { id: "love", label: "Travel for Love", emoji: "❤️" },
+            { id: "buddy", label: "Travel Buddy Seeker", emoji: "🧭" },
         ]
     }
 ];
 
-import { useUser } from "../../src/context/UserContext";
-
 export default function StyleStep() {
     const router = useRouter();
     const { updateProfile } = useUser();
+
     const [selected, setSelected] = useState<string[]>([]);
     const [search, setSearch] = useState("");
 
-    const MAX = 5;
+    const MAX = 7;
 
     const animatedScale = useRef<Record<string, Animated.Value>>({}).current;
 
+    /* SEARCH FILTER */
     const filteredCategories = useMemo(() => {
         if (!search.trim()) return categories;
+
         return categories
             .map((cat) => ({
                 ...cat,
-                items: cat.items.filter((v) =>
-                    v.label.toLowerCase().includes(search.toLowerCase())
+                items: cat.items.filter((item) =>
+                    item.label.toLowerCase().includes(search.toLowerCase())
                 )
             }))
             .filter((cat) => cat.items.length > 0);
     }, [search]);
 
-    const toggle = (id: string, animRef: Animated.Value) => {
+    /* TOGGLE WITH ANIMATION */
+    const toggle = (id: string, anim: Animated.Value) => {
         Animated.sequence([
-            Animated.timing(animRef, { toValue: 0.94, duration: 70, useNativeDriver: true }),
-            Animated.timing(animRef, { toValue: 1, duration: 120, useNativeDriver: true }),
+            Animated.timing(anim, { toValue: 0.9, duration: 70, useNativeDriver: true }),
+            Animated.timing(anim, { toValue: 1, duration: 120, useNativeDriver: true }),
         ]).start();
 
         if (selected.includes(id)) {
@@ -131,8 +134,10 @@ export default function StyleStep() {
     };
 
     const handleNext = () => {
-        updateProfile({ styles: selected });
-        router.push("/signup-wizard/step-4-whomeet");
+        if (selected.length === MAX) {
+            updateProfile({ styles: selected });
+            router.push("/signup-wizard/step-4-whomeet");
+        }
     };
 
     return (
@@ -140,12 +145,11 @@ export default function StyleStep() {
             <WizardProgress currentStep={3} totalSteps={8} />
 
             <Text style={styles.header}>What's your travel vibe?</Text>
-            <Text style={styles.sub}>Pick up to {MAX}</Text>
+            <Text style={styles.sub}>Pick exactly {MAX}</Text>
 
-            {/* Search Box */}
             <TextInput
                 style={styles.search}
-                placeholder="Search travel vibes..."
+                placeholder="Search travel vibes…"
                 placeholderTextColor="#999"
                 value={search}
                 onChangeText={setSearch}
@@ -153,7 +157,7 @@ export default function StyleStep() {
 
             <ScrollView contentContainerStyle={styles.scrollWrap}>
                 {filteredCategories.map((section) => (
-                    <View key={section.title} style={{ marginBottom: 30 }}>
+                    <View key={section.title} style={styles.section}>
                         <Text style={styles.category}>{section.title}</Text>
 
                         <View style={styles.pillWrap}>
@@ -161,34 +165,46 @@ export default function StyleStep() {
                                 if (!animatedScale[v.id]) {
                                     animatedScale[v.id] = new Animated.Value(1);
                                 }
-                                const scale = animatedScale[v.id];
+
+                                const anim = animatedScale[v.id];
                                 const isSelected = selected.includes(v.id);
 
                                 return (
                                     <Animated.View
                                         key={v.id}
-                                        style={{ transform: [{ scale }] }}
+                                        style={{ transform: [{ scale: anim }] }}
                                     >
                                         <TouchableOpacity
-                                            onPress={() => toggle(v.id, scale)}
+                                            onPress={() => toggle(v.id, anim)}
                                             activeOpacity={0.7}
                                             style={[
                                                 styles.pill,
-                                                isSelected && styles.pillSelected
+                                                isSelected && styles.pillSelected,
                                             ]}
                                         >
-                                            <Text
-                                                style={[
-                                                    styles.pillText,
-                                                    isSelected && styles.pillTextSelected
-                                                ]}
-                                            >
+                                            {/* EMOJI LEFT SIDE */}
+                                            <Text style={styles.emoji}>{v.emoji}</Text>
+
+                                            <Text style={[
+                                                styles.pillText,
+                                                isSelected && styles.pillSelectedText
+                                            ]}>
                                                 {v.label}
                                             </Text>
 
-                                            <Text style={styles.plus}>
-                                                {isSelected ? "✓" : "+"}
-                                            </Text>
+                                            {/* INDICATOR */}
+                                            <View style={[
+                                                styles.indicator,
+                                                isSelected && styles.indicatorSelected
+                                            ]}>
+                                                <Text style={[
+                                                    styles.indicatorText,
+                                                    isSelected && styles.indicatorTextSelected
+                                                ]}>
+                                                    {isSelected ? "✓" : "+"}
+                                                </Text>
+                                            </View>
+
                                         </TouchableOpacity>
                                     </Animated.View>
                                 );
@@ -200,18 +216,14 @@ export default function StyleStep() {
 
             {/* Bottom Navigation */}
             <View style={styles.bottom}>
-                <TouchableOpacity onPress={handleNext}>
-                    <Text style={styles.skip}>Skip</Text>
-                </TouchableOpacity>
-
-                <Text style={styles.count}>{selected.length}/{MAX} selected</Text>
+                <Text style={styles.count}>{selected.length}/{MAX}</Text>
 
                 <TouchableOpacity
-                    disabled={selected.length === 0}
+                    disabled={selected.length !== MAX}
                     onPress={handleNext}
                     style={[
                         styles.nextBtn,
-                        selected.length === 0 && styles.nextDisabled
+                        selected.length !== MAX && styles.nextDisabled
                     ]}
                 >
                     <MaterialCommunityIcons name="arrow-right" size={22} color="#fff" />
@@ -221,126 +233,124 @@ export default function StyleStep() {
     );
 }
 
-/* ---------------- STYLES ---------------- */
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#FDFDFD", padding: 20 },
+/* ------------ BEAUTIFUL UPDATED UI STYLES ------------ */
 
-    header: {
-        fontSize: 26,
-        fontFamily: FONT.UI_BOLD,
-        color: COLORS.TEXT,
-        marginBottom: 6,
-        marginTop: 10,
-    },
-    sub: {
-        fontSize: 15,
-        color: COLORS.MUTED,
-        marginBottom: 14,
-    },
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: "#FCFCFC", padding: 20 },
+
+    header: { fontSize: 28, fontFamily: FONT.UI_BOLD, marginBottom: 6, color: COLORS.TEXT },
+    sub: { fontSize: 15, color: COLORS.MUTED, marginBottom: 14 },
 
     search: {
         backgroundColor: "#fff",
         borderRadius: 12,
         padding: 14,
         borderWidth: 1,
-        borderColor: "#DCDCDC",
+        borderColor: "#E3E3E3",
         marginBottom: 16,
         fontFamily: FONT.UI_REGULAR,
-        fontSize: 15,
     },
 
-    scrollWrap: {
-        paddingBottom: 150,
-    },
+    scrollWrap: { paddingBottom: 140 },
+    section: { marginBottom: 26 },
 
-    category: {
-        fontSize: 17,
-        fontFamily: FONT.UI_BOLD,
-        color: COLORS.TEXT,
-        marginBottom: 10,
-    },
+    category: { fontSize: 18, fontFamily: FONT.UI_BOLD, color: COLORS.TEXT, marginBottom: 10 },
 
-    pillWrap: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 14,
-    },
+    pillWrap: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
 
     pill: {
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "space-between",
-
         paddingVertical: 12,
-        paddingHorizontal: 18,
-
+        paddingHorizontal: 16,
         backgroundColor: "#fff",
-        borderRadius: 12,
+        borderRadius: 14,
         borderWidth: 1.4,
-        borderColor: "#CFCFCF",
+        borderColor: "#D3D3D3",
+        minWidth: 150,
 
-        minWidth: 130,
+        shadowColor: "#000",
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 3,
     },
 
     pillSelected: {
         borderColor: "#000",
+        backgroundColor: "#F1F1F1",
+        shadowOpacity: 0.15,
+        elevation: 5,
+    },
+
+    emoji: {
+        fontSize: 20,
+        marginRight: 8,
     },
 
     pillText: {
+        flex: 1,
         fontSize: 15,
         fontFamily: FONT.UI_MEDIUM,
-        color: "#000",
+        color: COLORS.TEXT,
     },
 
-    pillTextSelected: {
+    pillSelectedText: {
+        fontFamily: FONT.UI_BOLD,
+        color: COLORS.TEXT,
+    },
+
+    indicator: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        borderWidth: 1.4,
+        borderColor: "#000",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    indicatorSelected: {
+        backgroundColor: "#000",
+        borderColor: "#000",
+    },
+
+    indicatorText: {
+        fontSize: 16,
         fontFamily: FONT.UI_BOLD,
         color: "#000",
     },
 
-    plus: {
-        fontSize: 18,
-        marginLeft: 10,
-        color: "#000",
+    indicatorTextSelected: {
+        color: "#fff",
     },
 
     bottom: {
         position: "absolute",
+        bottom: 0,
         left: 0,
         right: 0,
-        bottom: 0,
         height: 85,
         backgroundColor: "#fff",
         borderTopWidth: 1,
         borderTopColor: "#E5E5E5",
 
         flexDirection: "row",
-        justifyContent: "space-between",
         alignItems: "center",
-        paddingHorizontal: 24,
+        justifyContent: "space-between",
+        paddingHorizontal: 26,
     },
 
-    skip: {
-        fontSize: 15,
-        fontFamily: FONT.UI_MEDIUM,
-        color: COLORS.TEXT,
-    },
-
-    count: {
-        fontSize: 15,
-        fontFamily: FONT.UI_REGULAR,
-        color: COLORS.MUTED,
-    },
+    count: { fontSize: 15, color: COLORS.MUTED },
 
     nextBtn: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        justifyContent: "center",
+        backgroundColor: "#000",
         alignItems: "center",
-        backgroundColor: "#191A23",
+        justifyContent: "center",
     },
 
-    nextDisabled: {
-        backgroundColor: "#D8D8D8",
-    },
+    nextDisabled: { backgroundColor: "#BEBEBE" }
 });

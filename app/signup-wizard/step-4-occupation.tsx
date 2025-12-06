@@ -1,6 +1,7 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
+import { Controller, useForm } from "react-hook-form";
 import {
     Animated,
     StyleSheet,
@@ -9,68 +10,93 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import * as yup from "yup";
 import WizardProgress from "../../src/components/WizardProgress";
 import { COLORS, FONT } from "../../src/constants/theme";
-
 import { useUser } from "../../src/context/UserContext";
+import { useCollegeSearch } from "../../src/hooks/useCollegeSearch";
+
+/* ------------------- VALIDATION ------------------- */
+const occupationSchema = yup.object().shape({
+    occupation: yup.string().required("Select an option"),
+
+    college: yup.string().when("occupation", {
+        is: "Student",
+        then: (schema) => schema.required("Enter your college"),
+        otherwise: (schema) => schema.optional(),
+    }),
+
+    company: yup.string().when("occupation", {
+        is: "Employed",
+        then: (schema) => schema.required("Enter your company"),
+        otherwise: (schema) => schema.optional(),
+    }),
+});
 
 export default function OccupationStep() {
     const router = useRouter();
     const { updateProfile } = useUser();
-    const [selected, setSelected] = useState<string | null>(null);
-    const [customOccupation, setCustomOccupation] = useState("");
 
-    // Common occupations
-    const options = [
-        "Employed",
-        "Student",
-        "Entrepreneur",
-        "Freelancer",
-        "Retired"
-    ];
+    const options = ["Employed", "Student", "Entrepreneur", "Freelancer", "Retired"];
 
-    const scaleAnim = useRef(options.reduce((acc, o) => {
-        acc[o] = new Animated.Value(1);
-        return acc;
-    }, {} as Record<string, Animated.Value>)).current;
+    const {
+        control,
+        handleSubmit,
+        setValue,
+        watch,
+        formState: { isValid, errors },
+    } = useForm({
+        resolver: yupResolver(occupationSchema),
+        defaultValues: {
+            occupation: "",
+            college: "",
+            company: "",
+        },
+        mode: "onChange",
+    });
+
+    const occupation = watch("occupation");
+    const collegeValue = watch("college");
+    const { results, loading } = useCollegeSearch(collegeValue || "");
+    const [showSuggestions, setShowSuggestions] = React.useState(false);
+
+    const scaleAnim = useRef(
+        options.reduce((acc, o) => {
+            acc[o] = new Animated.Value(1);
+            return acc;
+        }, {} as Record<string, Animated.Value>)
+    ).current;
 
     const toggle = (o: string) => {
         const anim = scaleAnim[o];
 
-        // Press animation
         Animated.sequence([
-            Animated.timing(anim, { toValue: 0.96, duration: 90, useNativeDriver: true }),
+            Animated.timing(anim, { toValue: 0.95, duration: 90, useNativeDriver: true }),
             Animated.timing(anim, { toValue: 1, duration: 120, useNativeDriver: true }),
         ]).start();
 
-        setSelected(o);
-        setCustomOccupation(""); // Reset custom if picking a preset
+        setValue("occupation", o, { shouldValidate: true });
     };
 
-    const handleCustomChange = (text: string) => {
-        setCustomOccupation(text);
-        if (text.length > 0) setSelected("Custom");
-        else setSelected(null);
+    const onSubmit = (data: any) => {
+        updateProfile({
+            occupation: data.occupation,
+            company: data.company,
+            college: data.college,
+        });
+        router.push("/signup-wizard/step-5-addtrip");
     };
 
     return (
         <View style={styles.container}>
-
-            {/* Progress Bar - Treat this as step 4 still, or maybe 5 if we renumber? 
-                User said 4.1, let's keep it vaguely in that zone or just hide the specific number if needed.
-                For now using 4 to show it's part of that phase or 5 if we stretch it.
-            */}
             <WizardProgress currentStep={4.5} totalSteps={8} />
 
-            {/* Title */}
             <Text style={styles.header}>What's your occupation?</Text>
-            <Text style={styles.sub}>
-                Let others know what keeps you busy.
-            </Text>
+            <Text style={styles.sub}>Let others know what keeps you busy.</Text>
 
-            {/* Options */}
+            {/* OPTIONS */}
             {options.map((o) => {
-                const isSelected = selected === o;
+                const isSelected = occupation === o;
 
                 return (
                     <Animated.View key={o} style={{ transform: [{ scale: scaleAnim[o] }] }}>
@@ -83,11 +109,7 @@ export default function OccupationStep() {
                                 {o}
                             </Text>
 
-                            {/* Radio Circle */}
-                            <View style={[
-                                styles.radioCircle,
-                                isSelected && styles.radioCircleSelected
-                            ]}>
+                            <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
                                 {isSelected && <View style={styles.radioInner} />}
                             </View>
                         </TouchableOpacity>
@@ -95,51 +117,97 @@ export default function OccupationStep() {
                 );
             })}
 
-            {/* Custom Input */}
-            <View style={[styles.option, selected === "Custom" && styles.optionSelected, { marginTop: 10, paddingVertical: 14 }]}>
-                <TextInput
-                    style={[styles.input, selected === "Custom" && styles.optionTextSelected]}
-                    placeholder="Other (Type here...)"
-                    placeholderTextColor={selected === "Custom" ? "rgba(255,255,255,0.6)" : COLORS.MUTED}
-                    value={customOccupation}
-                    onChangeText={handleCustomChange}
-                    onFocus={() => setSelected("Custom")}
-                />
-                {selected === "Custom" && (
-                    <View style={[styles.radioCircle, styles.radioCircleSelected]}>
-                        <View style={styles.radioInner} />
-                    </View>
-                )}
-            </View>
+            {/* ----------------- EMPLOYED ------------------ */}
+            {occupation === "Employed" && (
+                <View style={styles.extraBox}>
+                    <Text style={styles.extraLabel}>Company Name</Text>
 
+                    <Controller
+                        control={control}
+                        name="company"
+                        render={({ field: { onChange, value } }) => (
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Where do you work?"
+                                placeholderTextColor="#999"
+                                value={value}
+                                onChangeText={onChange}
+                            />
+                        )}
+                    />
 
-            {/* Floating Next Button */}
+                    {errors.company && <Text style={styles.error}>{errors.company.message}</Text>}
+                </View>
+            )}
+
+            {/* ----------------- STUDENT ------------------ */}
+            {occupation === "Student" && (
+                <View style={styles.extraBox}>
+                    <Text style={styles.extraLabel}>College / University</Text>
+
+                    <Controller
+                        control={control}
+                        name="college"
+                        render={({ field: { onChange, value } }) => {
+                            return (
+                                <View>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Which college do you attend?"
+                                        placeholderTextColor="#999"
+                                        value={value}
+                                        onChangeText={(text) => {
+                                            onChange(text);
+                                            setShowSuggestions(true);
+                                        }}
+                                    />
+
+                                    {loading && (
+                                        <Text style={{ fontSize: 12, marginTop: 4, color: "#191A23" }}>
+                                            Searching…
+                                        </Text>
+                                    )}
+
+                                    {showSuggestions && results.length > 0 && (
+                                        <View style={styles.suggestionBox}>
+                                            {results.slice(0, 8).map((item, index) => (
+                                                <TouchableOpacity
+                                                    key={index}
+                                                    onPress={() => {
+                                                        onChange(item.name);
+                                                        setShowSuggestions(false);
+                                                    }}
+                                                    style={styles.suggestionItem}
+                                                >
+                                                    <Text style={styles.suggestionText}>{item.name}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    )}
+                                </View>
+                            );
+                        }}
+                    />
+
+                    {errors.college && <Text style={styles.error}>{errors.college.message}</Text>}
+                </View>
+            )}
+
+            {/* CONTINUE BUTTON */}
             <TouchableOpacity
-                style={[styles.nextBtn, !selected && styles.nextBtnDisabled]}
-                disabled={!selected}
-                onPress={() => {
-                    const finalOccupation = selected === "Custom" ? customOccupation : selected;
-                    if (finalOccupation) {
-                        updateProfile({ occupation: finalOccupation });
-                        router.push("/signup-wizard/step-5-addtrip");
-                    }
-                }}
+                style={[styles.continueBtn, !isValid && styles.continueDisabled]}
+                disabled={!isValid}
+                onPress={handleSubmit(onSubmit)}
             >
-                <MaterialCommunityIcons name="arrow-right" size={26} color="#fff" />
+                <Text style={styles.continueText}>Continue</Text>
             </TouchableOpacity>
-
         </View>
     );
 }
 
 /* ---------------------- STYLES -------------------------- */
-
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        padding: 22,
-        backgroundColor: "#F3F3F3",
-    },
+    container: { flex: 1, padding: 22, backgroundColor: "#F3F3F3" },
 
     header: {
         fontSize: 28,
@@ -151,13 +219,10 @@ const styles = StyleSheet.create({
 
     sub: {
         fontSize: 15,
-        fontFamily: FONT.UI_REGULAR,
         color: COLORS.MUTED,
         marginBottom: 24,
-        lineHeight: 20,
     },
 
-    /* Option Pills */
     option: {
         flexDirection: "row",
         alignItems: "center",
@@ -186,15 +251,6 @@ const styles = StyleSheet.create({
         fontFamily: FONT.UI_BOLD,
     },
 
-    input: {
-        flex: 1,
-        fontSize: 16,
-        fontFamily: FONT.UI_MEDIUM,
-        color: COLORS.TEXT,
-        paddingRight: 10,
-    },
-
-    /* Radio Circle */
     radioCircle: {
         width: 24,
         height: 24,
@@ -206,38 +262,89 @@ const styles = StyleSheet.create({
     },
 
     radioCircleSelected: {
+        backgroundColor: "#B9FF66",
         borderColor: "#B9FF66",
-        backgroundColor: "#B9FF66", // Or transparent if we want just ring, but filled looks better here? 
-        // Let's match the checkmark style from previous steps but radio
     },
 
     radioInner: {
         width: 10,
         height: 10,
         borderRadius: 5,
-        backgroundColor: "#191A23",
+        backgroundColor: "#08080aff",
     },
 
-    /* Floating Next Button */
-    nextBtn: {
-        position: "absolute",
-        bottom: 30,
-        right: 24,
-        width: 58,
-        height: 58,
-        borderRadius: 29,
-        backgroundColor: "#191A23",
-        justifyContent: "center",
+    extraBox: {
+        backgroundColor: "#fff",
+        borderRadius: 14,
+        padding: 16,
+        borderWidth: 1.4,
+        borderColor: "#D9D9D9",
+        marginTop: 6,
+        marginBottom: 16,
+    },
+
+    extraLabel: {
+        fontSize: 14,
+        marginBottom: 6,
+        fontFamily: FONT.UI_MEDIUM,
+        color: COLORS.TEXT,
+    },
+
+    input: {
+        paddingVertical: 10,
+        fontSize: 15,
+        borderBottomWidth: 1,
+        borderColor: "#E0E0E0",
+        color: COLORS.TEXT,
+        fontFamily: FONT.UI_REGULAR,
+    },
+
+    suggestionBox: {
+        backgroundColor: "#FFF",
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: "#D9D9D9",
+        marginTop: 6,
+        maxHeight: 180,
+        overflow: "hidden",
+    },
+
+    suggestionItem: {
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderBottomWidth: 1,
+        borderColor: "#F0F0F0",
+    },
+
+    suggestionText: {
+        fontSize: 14,
+        color: "#191A23",
+        fontFamily: FONT.UI_REGULAR,
+    },
+
+    error: {
+        color: "red",
+        fontSize: 12,
+        marginTop: 4,
+    },
+
+    continueBtn: {
+        marginTop: "auto",
+        marginBottom: 10,
+        paddingVertical: 16,
+        backgroundColor: "#B9FF66",
+        borderRadius: 999,
         alignItems: "center",
-        elevation: 8,
-        shadowColor: "#000",
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 3 },
+        justifyContent: "center",
     },
 
-    nextBtnDisabled: {
+    continueDisabled: {
         backgroundColor: "#C4C4C4",
-        elevation: 0,
-    }
+    },
+
+    continueText: {
+        color: "#000000ff",
+        fontFamily: FONT.UI_BOLD,
+        fontSize: 16,
+    },
 });

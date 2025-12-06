@@ -1,11 +1,11 @@
 // DiscoverScreen.tsx
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { format } from "date-fns";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
-  Easing,
   Image,
   PanResponder,
   Pressable,
@@ -14,36 +14,51 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { COLORS, FONT } from "../../src/constants/theme";
+import { useUser } from "../../src/context/UserContext";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const SWIPE_THRESHOLD = SCREEN_W * 0.25;
-const SUPERLIKE_THRESHOLD = -120;
 const CARD_WIDTH = SCREEN_W - 32;
 
-/* ---------------- DEMO DATA (supports multiple prompts) ---------------- */
-const demoProfiles = [
+/* ---------------- TYPES ---------------- */
+type Profile = {
+  id: string;
+  name: string;
+  pronouns: string;
+  verified: boolean;
+  badges: string[];
+  photos: string[];
+  prompts: { q: string; a: string }[];
+  distanceKm: number;
+  travelCompatibility: number;
+  bio: string;
+  recentTrip?: any;
+};
+
+/* ---------------- DEMO DATA ---------------- */
+const demoProfiles: Profile[] = [
   {
     id: "p1",
     name: "Poorva",
     pronouns: "she/her",
     verified: true,
-    badges: ["Foodie", "Beach lover", "Nightlife"],
+    badges: ["Foodie", "Beach Lover", "Nightlife"],
     photos: [
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=2000",
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=2000",
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=2000",
+      "https://images.unsplash.com/photo-1544005313-94ddf0286df2",
+      "https://images.unsplash.com/photo-1517841905240-472988babdf9",
+      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1",
     ],
     prompts: [
-      { q: "I go crazy for", a: "Good food and cricket" },
-      { q: "My type is", a: "Someone who loves sunsets & long walks" },
-      { q: "A fun fact", a: "I’ve backpacked across 11 countries" },
+      { q: "A travel moment I'll never forget…", a: "Sunrise in Varanasi." },
+      { q: "Two things I always pack…", a: "Sunscreen & a good book." },
+      { q: "My ideal travel buddy is someone who…", a: "Knows the best food spots." },
     ],
     distanceKm: 4.6,
     travelCompatibility: 82,
-    bio: "Coffee, beaches, and spontaneous road trips. Always packing snacks.",
+    bio: "Coffee, beaches, and spontaneous road trips.",
   },
   {
     id: "p2",
@@ -52,247 +67,171 @@ const demoProfiles = [
     verified: false,
     badges: ["Hiker", "Street Food", "Ramen"],
     photos: [
-      "https://images.unsplash.com/photo-1545996124-1a61c1d7a5a9?q=80",
-      "https://images.unsplash.com/photo-1544006659-f0b21884ce1d?q=80",
+      "https://images.unsplash.com/photo-1545996124-1a61c1d7a5a9",
+      "https://images.unsplash.com/photo-1544006659-f0b21884ce1d",
     ],
     prompts: [
-      { q: "My weekend looks like", a: "Hiking and trying street food" },
-      { q: "Most likely to", a: "Book a last-minute weekend trip" },
-      { q: "Favorite snack", a: "Gobi Manchurian" },
+      { q: "A travel moment I'll never forget…", a: "Getting lost in Tokyo." },
+      { q: "Two things I always pack…", a: "Camera & power bank." },
+      { q: "My ideal travel buddy is someone who…", a: "Is down for hiking." },
     ],
     distanceKm: 12.3,
     travelCompatibility: 68,
-    bio: "UX designer who loves ramen & roadtrips.",
+    bio: "UX designer who loves ramen & travel.",
   },
 ];
 
-/* ------------------ DiscoverScreen Component ------------------ */
-import { useUser } from "../../src/context/UserContext";
-
-/* ------------------ DiscoverScreen Component ------------------ */
+/* ---------------- MAIN COMPONENT ---------------- */
 export default function DiscoverScreen() {
   const router = useRouter();
-  const { profile } = useUser();
+  const { profile, setViewedProfile } = useUser();
 
-  // Calculate compatibility dynamically
+  /* Build data list including user preview */
   const [profiles, setProfiles] = useState(() => {
-    return demoProfiles.map(p => {
-      // Simple match logic: count shared interest vs total user interests
-      let matchCount = 0;
-      if (profile?.styles) {
-        const pTags = new Set([...p.badges, ...(p.prompts?.map(x => x.a) || [])].map(s => s.toLowerCase()));
-        profile.styles.forEach(s => {
-          // Loose matching to simulate hits
-          if (pTags.has(s.toLowerCase()) || Math.random() > 0.7) matchCount++;
-        });
-      }
-      // Base score 60 + bonus
-      const score = Math.min(99, 60 + (matchCount * 10) + Math.floor(Math.random() * 10));
-      return { ...p, travelCompatibility: score };
-    });
+    let arr = [...demoProfiles];
+
+    if (profile.name) {
+      arr.unshift({
+        id: "me",
+        name: `${profile.name} (You)`,
+        pronouns: profile.gender === "Female" ? "she/her" : "he/him",
+        verified: true,
+        badges: profile.styles || [],
+        photos: profile.photos || ["https://via.placeholder.com/400x600"],
+        prompts: profile.prompts?.map((p: any) => ({ q: p.question || p.q, a: p.answer || p.a })) || [],
+        distanceKm: 0,
+        travelCompatibility: 100,
+        bio: profile.lookingFor || "",
+        recentTrip: profile.recentTrip,
+      });
+    }
+
+    return arr;
   });
 
   const [index, setIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [showMatch, setShowMatch] = useState({ visible: false, title: "" });
+  const [loading, setLoading] = useState(false);
+  const [showMatch, setShowMatch] = useState(false);
 
-  // Animated values
+  /* 👉 FIX: p is NOW defined BEFORE handlers use it */
+  const p = profiles[index];
+
+  /* Animations */
   const position = useRef(new Animated.ValueXY()).current;
-  const fadeIn = useRef(new Animated.Value(0)).current;
-  const cardScale = useRef(new Animated.Value(1)).current;
   const matchScale = useRef(new Animated.Value(0)).current;
+  const cardOpacity = useRef(new Animated.Value(1)).current;
 
-  // Carousel helper
+  /* Carousel */
   const photoScrollRef = useRef<ScrollView>(null);
-  const photoIndex = useRef(0);
+  const currentPhoto = useRef(0);
 
-  // Bottom sheet
-  const sheetAnim = useRef(new Animated.Value(SCREEN_H)).current;
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const dragSheetResponder = useRef<any>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  /* ---------------- HANDLERS ---------------- */
 
-  /* ------------------ Loading / fade in ------------------ */
-  useEffect(() => {
-    // Simulate finding people near your location
-    const t = setTimeout(() => {
-      setLoading(false);
-      Animated.timing(fadeIn, { toValue: 1, duration: 350, useNativeDriver: true }).start();
-    }, 800);
-    return () => clearTimeout(t);
-  }, []);
+  const handlePhotoTap = () => {
+    if (!p || !p.photos.length) return;
+    currentPhoto.current = (currentPhoto.current + 1) % p.photos.length;
 
-  /* ------------------ Tap to change photo ------------------ */
-  const handlePhotoTap = (e: any) => {
-    const p = profiles[index];
-    if (!p) return;
+    photoScrollRef.current?.scrollTo({
+      x: currentPhoto.current * CARD_WIDTH,
+      animated: true,
+    });
+  };
 
-    // reset auto rotation if we had one? No we removed it.
+  const goNextCard = () => {
+    setIndex((i) => i + 1);
+    position.setValue({ x: 0, y: 0 });
+    currentPhoto.current = 0;
+  };
 
-    const x = e.nativeEvent.locationX;
-    const isRight = x > CARD_WIDTH / 2;
+  const swipeAction = (dir: "left" | "right") => {
+    if (dir === "right") {
+      setShowMatch(true);
+      Animated.spring(matchScale, { toValue: 1, useNativeDriver: true }).start();
 
-    let nextIndex = photoIndex.current;
-    if (isRight) {
-      if (nextIndex < p.photos.length - 1) nextIndex++;
-      else nextIndex = 0; // Loop or stop? Dating apps usually stop or loop. Loop is fine.
+      setTimeout(() => {
+        matchScale.setValue(0);
+        setShowMatch(false);
+        goNextCard();
+      }, 1300);
     } else {
-      if (nextIndex > 0) nextIndex--;
-      else nextIndex = p.photos.length - 1;
+      goNextCard();
     }
-
-    photoIndex.current = nextIndex;
-    photoScrollRef.current?.scrollTo({ x: nextIndex * CARD_WIDTH, animated: true });
-    // Force update to re-render dots if needed, but we used ref for index tracking in render... 
-    // Wait, the dots rely on 'photoIndex.current' which isn't state. We need to trigger re-render or use state for dots.
-    // Let's use setTick to force render.
-    setTick(t => t + 1);
-  };
-  const [tick, setTick] = useState(0); // force re-render for dots
-
-  /* ------------------ Card lift micro-interaction ------------------ */
-  const lift = () => {
-    Animated.spring(cardScale, { toValue: 1.04, useNativeDriver: true }).start();
-  };
-  const drop = () => {
-    Animated.spring(cardScale, { toValue: 1, useNativeDriver: true }).start();
   };
 
-  /* ------------------ PanResponder (swipe + superlike) ------------------ */
+  /* PanResponder for card swipe */
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => lift(),
-      onPanResponderMove: Animated.event([null, { dx: position.x, dy: position.y }], {
-        useNativeDriver: false,
-      }),
-      onPanResponderRelease: (_, g) => {
-        drop();
 
-        // Super-like (swipe up)
-        if (g.dy < SUPERLIKE_THRESHOLD && Math.abs(g.dx) < 80) {
-          Animated.timing(position, {
-            toValue: { x: 0, y: -SCREEN_H },
-            duration: 240,
-            useNativeDriver: true,
-          }).start(() => {
-            handleSuperLike();
-          });
-          return;
-        }
+      onPanResponderMove: (_, gesture) => {
+        position.setValue({ x: gesture.dx, y: gesture.dy });
+      },
 
-        if (g.dx > SWIPE_THRESHOLD) {
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dx > SWIPE_THRESHOLD) {
+          // LIKE
           Animated.timing(position, {
-            toValue: { x: SCREEN_W * 1.4, y: g.dy },
-            duration: 220,
-            useNativeDriver: true,
-          }).start(() => handleSwipe("right"));
-        } else if (g.dx < -SWIPE_THRESHOLD) {
+            toValue: { x: SCREEN_W * 1.2, y: gesture.dy },
+            duration: 200,
+            useNativeDriver: false,
+          }).start(() => swipeAction("right"));
+        } else if (gesture.dx < -SWIPE_THRESHOLD) {
+          // NOPE
           Animated.timing(position, {
-            toValue: { x: -SCREEN_W * 1.4, y: g.dy },
-            duration: 220,
-            useNativeDriver: true,
-          }).start(() => handleSwipe("left"));
+            toValue: { x: -SCREEN_W * 1.2, y: gesture.dy },
+            duration: 200,
+            useNativeDriver: false,
+          }).start(() => swipeAction("left"));
         } else {
-          Animated.spring(position, { toValue: { x: 0, y: 0 }, useNativeDriver: true }).start();
+          // RESET
+          Animated.spring(position, {
+            toValue: { x: 0, y: 0 },
+            friction: 5,
+            useNativeDriver: false,
+          }).start();
         }
       },
     })
   ).current;
 
-  /* ------------------ Swipe handlers ------------------ */
-  const handleSwipe = (dir: "left" | "right") => {
-    const popped = profiles[index];
-    setIndex((s) => s + 1);
-    position.setValue({ x: 0, y: 0 });
-
-    if (dir === "right") {
-      // simulate match chance
-      if (Math.random() < 0.36) openMatch(`${popped.name} matched!`);
-    }
-  };
-  const handleSuperLike = () => {
-    const popped = profiles[index];
-    openMatch(`Super Like — ${popped.name}`);
-    setIndex((s) => s + 1);
-    position.setValue({ x: 0, y: 0 });
-  };
-
-  /* ------------------ Match animation ------------------ */
-  const openMatch = (title: string) => {
-    setShowMatch({ visible: true, title });
-    matchScale.setValue(0);
-    Animated.timing(matchScale, {
-      toValue: 1,
-      duration: 420,
-      easing: Easing.out(Easing.exp),
-      useNativeDriver: true,
-    }).start(() => {
-      setTimeout(() => {
-        Animated.timing(matchScale, { toValue: 0, duration: 260, useNativeDriver: true }).start(() =>
-          setShowMatch({ visible: false, title: "" })
-        );
-      }, 1100);
-    });
-  };
-
-  /* ------------------ Bottom sheet open/close & drag ------------------ */
-  const openSheet = () => {
-    setSheetOpen(true);
-    Animated.parallel([
-      Animated.timing(sheetAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
-      Animated.timing(backdropOpacity, { toValue: 1, duration: 260, useNativeDriver: true }),
-    ]).start();
-  };
-  const closeSheet = () => {
-    Animated.parallel([
-      Animated.timing(sheetAnim, { toValue: SCREEN_H, duration: 260, useNativeDriver: true }),
-      Animated.timing(backdropOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
-    ]).start(() => setSheetOpen(false));
-  };
-
-  dragSheetResponder.current = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onPanResponderMove: (_, g) => {
-      if (g.dy > 0) sheetAnim.setValue(g.dy);
-    },
-    onPanResponderRelease: (_, g) => {
-      if (g.dy > 120) closeSheet();
-      else openSheet();
-    },
-  });
-
-  /* ------------------ Helpers: current profile ------------------ */
-  const p = profiles[index];
-
-  /* ------------------ Skeleton while loading ------------------ */
+  /* ---------------- LOADING STATE ---------------- */
   if (loading) {
     return (
-      <View style={styles.skeletonWrapper}>
-        <View style={styles.skeletonCard} />
-        <View style={styles.skeletonLine} />
-        <View style={[styles.skeletonLine, { width: "60%" }]} />
+      <View style={styles.loadingScreen}>
+        <View style={styles.skelCard} />
+        <View style={styles.skelLine} />
       </View>
     );
   }
 
+  /* ---------------- NO MORE PROFILES ---------------- */
   if (!p) {
     return (
-      <View style={styles.empty}>
-        <Text style={styles.emptyText}>You’re all caught up 🎉</Text>
+      <View style={styles.endScreen}>
+        <Text style={styles.endText}>No more profiles 🎉</Text>
       </View>
     );
   }
 
-  /* ------------------ Interpolations ------------------ */
+  /* ---------------- ANIM INTERPOLATIONS ---------------- */
   const rotate = position.x.interpolate({
     inputRange: [-SCREEN_W / 2, 0, SCREEN_W / 2],
     outputRange: ["-12deg", "0deg", "12deg"],
   });
 
-  const likeOpacity = position.x.interpolate({ inputRange: [0, SCREEN_W * 0.25], outputRange: [0, 1], extrapolate: "clamp" });
-  const nopeOpacity = position.x.interpolate({ inputRange: [-SCREEN_W * 0.25, 0], outputRange: [1, 0], extrapolate: "clamp" });
+  const likeOpacity = position.x.interpolate({
+    inputRange: [0, SCREEN_W * 0.25],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
 
+  const nopeOpacity = position.x.interpolate({
+    inputRange: [-SCREEN_W * 0.25, 0],
+    outputRange: [1, 0],
+    extrapolate: "clamp",
+  });
+
+  /* ---------------- UI ---------------- */
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -303,21 +242,26 @@ export default function DiscoverScreen() {
           <Text style={styles.name}>{p.name}</Text>
           <View style={styles.row}>
             <Text style={styles.pronouns}>{p.pronouns}</Text>
-            {p.verified && <View style={styles.verified}><MaterialCommunityIcons name="check-decagram" size={14} color="#7C3AED" /></View>}
+            {p.verified && (
+              <View style={styles.verifiedBadge}>
+                <MaterialCommunityIcons name="check-decagram" size={14} color="#7C3AED" />
+              </View>
+            )}
           </View>
         </View>
 
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <TouchableOpacity onPress={openSheet} style={styles.iconBtn}>
-            <MaterialCommunityIcons name="account-circle" size={26} color={COLORS.TEXT} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn}>
-            <MaterialCommunityIcons name="dots-horizontal" size={22} color={COLORS.MUTED} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.iconBtn}
+          onPress={() => {
+            setViewedProfile(p);
+            router.push("/profile-detail");
+          }}
+        >
+          <MaterialCommunityIcons name="account-circle" size={28} color={COLORS.TEXT} />
+        </TouchableOpacity>
       </View>
 
-      {/* CARD (swipeable) */}
+      {/* SWIPE CARD */}
       <Animated.View
         {...panResponder.panHandlers}
         style={[
@@ -327,13 +271,11 @@ export default function DiscoverScreen() {
               { translateX: position.x },
               { translateY: position.y },
               { rotate },
-              { scale: cardScale },
             ],
-            opacity: fadeIn,
           },
         ]}
       >
-        {/* LIKE / NOPE badges */}
+        {/* LIKE / NOPE BADGES */}
         <Animated.View style={[styles.likeBadge, { opacity: likeOpacity }]}>
           <Text style={styles.likeText}>LIKE</Text>
         </Animated.View>
@@ -341,38 +283,54 @@ export default function DiscoverScreen() {
           <Text style={styles.nopeText}>NOPE</Text>
         </Animated.View>
 
-        {/* Photo carousel */}
-        {/* Photo carousel with Tap Navigation */}
+        {/* PHOTO CAROUSEL */}
         <Pressable onPress={handlePhotoTap}>
           <ScrollView
-            ref={photoScrollRef}
             horizontal
             pagingEnabled
-            scrollEnabled={false} // Disable manual scroll to allow card swipe
-            showsHorizontalScrollIndicator={false}
+            ref={photoScrollRef}
+            scrollEnabled={false}
             style={styles.photoScroll}
           >
-            {p.photos.map((u, i) => (
-              <Image key={i} source={{ uri: u }} style={styles.photo} />
+            {p.photos.map((uri, i) => (
+              <Image key={i} source={{ uri }} style={styles.photo} />
             ))}
           </ScrollView>
         </Pressable>
 
-        {/* Photo dots */}
+        {/* DOTS */}
         <View style={styles.dots}>
           {p.photos.map((_, i) => (
-            <View key={i} style={i === photoIndex.current ? styles.dotActive : styles.dot} />
+            <View
+              key={i}
+              style={i === currentPhoto.current ? styles.dotActive : styles.dot}
+            />
           ))}
         </View>
 
-        {/* Card content */}
+        {/* CONTENT */}
         <View style={styles.cardContent}>
-          {/* Hinge-style horizontal prompts */}
+          {/* Recent Trip Banner */}
+          {p.recentTrip && (
+            <View style={styles.miniTripCard}>
+              <View style={styles.miniTripIcon}>
+                <MaterialCommunityIcons name="airplane-takeoff" size={16} color="#fff" />
+              </View>
+              <View>
+                <Text style={styles.miniTripLabel}>UPCOMING TRIP</Text>
+                <Text style={styles.miniTripDest}>
+                  {p.recentTrip.destination} • {format(new Date(p.recentTrip.startDate), "MMM dd")}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Prompts */}
           <ScrollView
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.promptScroll}
+            style={styles.promptScroll}
           >
             {p.prompts.map((pr, idx) => (
               <View key={idx} style={styles.promptCard}>
@@ -382,202 +340,249 @@ export default function DiscoverScreen() {
             ))}
           </ScrollView>
 
-          {/* Badges row */}
+          {/* Badges */}
           <View style={styles.badgeRow}>
-            {p.badges.map((b, i) => (
-              <View key={i} style={styles.badge}>
+            {p.badges.map((b, idx) => (
+              <View key={idx} style={styles.badge}>
                 <Text style={styles.badgeText}>{b}</Text>
               </View>
             ))}
           </View>
 
-          <TouchableOpacity onPress={openSheet} style={styles.seeProfile}>
+          <TouchableOpacity onPress={() => router.push("/profile-detail")}>
             <Text style={styles.seeProfileText}>See full profile →</Text>
           </TouchableOpacity>
         </View>
       </Animated.View>
 
-      {/* Bottom action buttons */}
-      <View style={styles.bottomRow}>
-        <TouchableOpacity onPress={() => { Animated.timing(position, { toValue: { x: -SCREEN_W * 1.2, y: 0 }, duration: 240, useNativeDriver: true }).start(() => handleSwipe("left")); }} style={styles.circleBtn}>
-          <MaterialCommunityIcons name="close" size={28} color="#000" />
+      {/* BOTTOM BUTTONS */}
+      <View style={styles.bottomButtons}>
+        <TouchableOpacity
+          style={styles.circleBtn}
+          onPress={() =>
+            Animated.timing(position, {
+              toValue: { x: -SCREEN_W * 1.2, y: 0 },
+              duration: 240,
+              useNativeDriver: true,
+            }).start(() => swipeAction("left"))
+          }
+        >
+          <MaterialCommunityIcons name="close" size={30} color="#000" />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => { Animated.timing(position, { toValue: { x: SCREEN_W * 1.2, y: 0 }, duration: 240, useNativeDriver: true }).start(() => handleSwipe("right")); }} style={[styles.circleBtn, styles.likeBtn]}>
-          <MaterialCommunityIcons name="heart" size={28} color="#fff" />
+        <TouchableOpacity
+          style={[styles.circleBtn, styles.likeBtn]}
+          onPress={() =>
+            Animated.timing(position, {
+              toValue: { x: SCREEN_W * 1.2, y: 0 },
+              duration: 240,
+              useNativeDriver: true,
+            }).start(() => swipeAction("right"))
+          }
+        >
+          <MaterialCommunityIcons name="heart" size={30} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* Match overlay */}
-      {showMatch.visible && (
-        <Animated.View style={[styles.matchOverlay, { transform: [{ scale: matchScale }] }]}>
-          <Text style={styles.matchTitle}>{showMatch.title}</Text>
-          <Text style={styles.matchSubtitle}>You both liked each other 💫</Text>
+      {/* MATCH OVERLAY */}
+      {showMatch && (
+        <Animated.View
+          style={[
+            styles.matchOverlay,
+            { transform: [{ scale: matchScale }] },
+          ]}
+        >
+          <Text style={styles.matchTitle}>It's a Match! 🎉</Text>
+          <Text style={styles.matchSubtitle}>You both liked each other</Text>
         </Animated.View>
       )}
-
-      {/* Backdrop */}
-      {sheetOpen && (
-        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-          <Pressable style={{ flex: 1 }} onPress={closeSheet} />
-        </Animated.View>
-      )}
-
-      {/* Full profile bottom sheet (Hinge-style) */}
-      <Animated.View {...dragSheetResponder.current?.panHandlers} style={[styles.sheet, { transform: [{ translateY: sheetAnim }] }]}>
-        <View style={styles.sheetHandle} />
-        <ScrollView style={{ flex: 1 }}>
-          {/* Hero image (first photo) */}
-          <Image source={{ uri: p.photos[0] }} style={styles.sheetHero} />
-
-          <View style={{ padding: 20 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <View>
-                <Text style={styles.sheetName}>{p.name}</Text>
-                <Text style={styles.sheetMeta}>{p.distanceKm} km • {p.travelCompatibility}% travel match</Text>
-              </View>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {p.verified && <View style={styles.verifiedBadge}><MaterialCommunityIcons name="check-decagram" size={16} color="#7C3AED" /></View>}
-              </View>
-            </View>
-
-            {/* badges */}
-            <Text style={styles.sectionTitle}>My Vibe</Text>
-            <View style={styles.sheetBadges}>
-              {p.badges.map((b, i) => <View key={i} style={styles.sheetBadge}><Text style={styles.sheetBadgeText}>{b}</Text></View>)}
-            </View>
-
-            {/* About / Bio */}
-            <Text style={styles.sectionTitle}>About</Text>
-            <Text style={styles.sheetBio}>{p.bio}</Text>
-
-            {/* Photos grid */}
-            <Text style={styles.sectionTitle}>Photos</Text>
-            <View style={styles.photoGrid}>
-              {p.photos.map((u, i) => (
-                <Image key={i} source={{ uri: u }} style={styles.gridPhoto} />
-              ))}
-            </View>
-
-            {/* Prompts */}
-            <Text style={styles.sectionTitle}>Prompts</Text>
-            {p.prompts.map((pr, i) => (
-              <View key={i} style={styles.sheetPrompt}>
-                <Text style={styles.sheetPromptQ}>{pr.q}</Text>
-                <Text style={styles.sheetPromptA}>{pr.a}</Text>
-              </View>
-            ))}
-
-            <TouchableOpacity
-              style={styles.primarySheetBtn}
-              onPress={() => {
-                closeSheet();
-                // In a real app, this would navigate to a specific chat room ID
-                // router.push({ pathname: "/chat/[id]", params: { id: p.id } });
-                // For now, go to the Chats tab
-                router.push("/(tabs)/chats");
-              }}
-            >
-              <Text style={styles.primarySheetBtnText}>Message {p.name}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={closeSheet} style={styles.ghostSheetBtn}>
-              <Text style={styles.ghostSheetText}>Close</Text>
-            </TouchableOpacity>
-
-            <View style={{ height: 40 }} />
-          </View>
-        </ScrollView>
-      </Animated.View>
     </View>
   );
 }
 
-/* ---------------------- STYLES ---------------------- */
+/* ---------------- STYLES ---------------- */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.BG, paddingTop: 40 },
 
-  /* skeleton */
-  skeletonWrapper: { padding: 20 },
-  skeletonCard: { width: CARD_WIDTH, height: 300, borderRadius: 18, backgroundColor: "#EAEAEA", alignSelf: "center" },
-  skeletonLine: { height: 14, backgroundColor: "#EAEAEA", borderRadius: 8, marginTop: 12, width: "80%", alignSelf: "center" },
-
-  empty: { flex: 1, alignItems: "center", justifyContent: "center" },
-  emptyText: { fontSize: 20, fontFamily: FONT.UI_BOLD, color: COLORS.MUTED },
-
-  topBar: { paddingHorizontal: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
-  name: { fontSize: 26, fontFamily: FONT.UI_BOLD, color: COLORS.TEXT },
+  topBar: {
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  name: { fontSize: 26, fontFamily: FONT.UI_BOLD },
   row: { flexDirection: "row", alignItems: "center" },
   pronouns: { fontSize: 12, color: COLORS.MUTED, marginRight: 8 },
-  iconBtn: { marginLeft: 10, padding: 6 },
+  verifiedBadge: {
+    width: 22,
+    height: 22,
+    backgroundColor: "#F2E7FF",
+    borderRadius: 6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  iconBtn: { padding: 6 },
 
-  verified: { width: 20, height: 20, borderRadius: 5, backgroundColor: "#F2E7FF", alignItems: "center", justifyContent: "center" },
+  card: {
+    width: CARD_WIDTH,
+    alignSelf: "center",
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    overflow: "hidden",
+    elevation: 6,
+  },
 
-  /* card */
-  card: { width: CARD_WIDTH, alignSelf: "center", borderRadius: 18, backgroundColor: "#fff", overflow: "hidden", elevation: 6 },
   photoScroll: { width: CARD_WIDTH, height: 380 },
-  photo: { width: CARD_WIDTH, height: 380, resizeMode: "cover" },
+  photo: { width: CARD_WIDTH, height: 380 },
 
-  dots: { position: "absolute", bottom: 12, width: CARD_WIDTH, flexDirection: "row", justifyContent: "center" },
-  dot: { width: 8, height: 8, borderRadius: 6, backgroundColor: "rgba(255,255,255,0.45)", marginHorizontal: 4 },
-  dotActive: { width: 10, height: 10, borderRadius: 6, backgroundColor: "#fff", marginHorizontal: 4 },
+  dots: {
+    position: "absolute",
+    bottom: 12,
+    width: CARD_WIDTH,
+    flexDirection: "row",
+    justifyContent: "center",
+  },
+  dot: {
+    width: 8, height: 8, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.4)", marginHorizontal: 4,
+  },
+  dotActive: {
+    width: 10, height: 10, borderRadius: 5, backgroundColor: "#fff", marginHorizontal: 4,
+  },
 
-  likeBadge: { position: "absolute", left: 18, top: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: "rgba(0,200,120,0.9)" },
+  likeBadge: {
+    position: "absolute",
+    left: 20,
+    top: 40,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "rgba(0,200,120,0.9)",
+  },
   likeText: { color: "#fff", fontFamily: FONT.UI_BOLD },
-  nopeBadge: { position: "absolute", right: 18, top: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: "rgba(230,70,70,0.95)" },
+
+  nopeBadge: {
+    position: "absolute",
+    right: 20,
+    top: 40,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "rgba(230,70,70,0.95)",
+  },
   nopeText: { color: "#fff", fontFamily: FONT.UI_BOLD },
 
   cardContent: { padding: 14 },
 
-  // Hinge-style prompt area
-  promptScroll: { paddingVertical: 6, paddingLeft: 0 },
-  promptCard: { width: CARD_WIDTH - 48, marginRight: 14, backgroundColor: "#F6F6F6", borderRadius: 12, padding: 12 },
+  promptScroll: { marginBottom: 10 },
+  promptCard: {
+    width: CARD_WIDTH - 48,
+    padding: 14,
+    marginRight: 12,
+    backgroundColor: "#F6F6F6",
+    borderRadius: 12,
+  },
   promptQ: { fontSize: 12, color: COLORS.MUTED },
-  promptA: { fontSize: 18, fontFamily: FONT.UI_BOLD, color: COLORS.TEXT, marginTop: 6 },
+  promptA: { fontSize: 18, fontFamily: FONT.UI_BOLD, marginTop: 4 },
 
-  badgeRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 12 },
-  badge: { backgroundColor: "#F3F3F3", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, marginRight: 8, marginBottom: 8 },
+  badgeRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 8 },
+  badge: {
+    backgroundColor: "#EFEFEF",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    marginRight: 8,
+    marginBottom: 8,
+  },
   badgeText: { fontSize: 12 },
 
-  seeProfile: { marginTop: 12 },
-  seeProfileText: { color: COLORS.MUTED, fontFamily: FONT.UI_MEDIUM },
+  seeProfileText: { color: COLORS.MUTED, marginTop: 8 },
 
-  bottomRow: { position: "absolute", bottom: 26, width: "100%", flexDirection: "row", justifyContent: "space-evenly" },
-  circleBtn: { width: 68, height: 68, borderRadius: 40, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", elevation: 6 },
+  bottomButtons: {
+    position: "absolute",
+    bottom: 26,
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+  },
+  circleBtn: {
+    width: 70,
+    height: 70,
+    borderRadius: 40,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 6,
+  },
   likeBtn: { backgroundColor: COLORS.TEXT },
 
-  /* match overlay */
-  matchOverlay: { position: "absolute", left: 36, right: 36, top: SCREEN_H * 0.28, padding: 20, backgroundColor: "#fff", borderRadius: 14, alignItems: "center", elevation: 10 },
-  matchTitle: { fontSize: 20, fontFamily: FONT.UI_BOLD },
-  matchSubtitle: { fontSize: 14, color: COLORS.MUTED, marginTop: 6 },
+  matchOverlay: {
+    position: "absolute",
+    left: 50,
+    right: 50,
+    top: SCREEN_H * 0.28,
+    backgroundColor: "#fff",
+    padding: 26,
+    borderRadius: 18,
+    alignItems: "center",
+    elevation: 12,
+  },
+  matchTitle: {
+    fontSize: 22,
+    fontFamily: FONT.UI_BOLD,
+  },
+  matchSubtitle: {
+    marginTop: 6,
+    color: COLORS.MUTED,
+  },
 
-  /* backdrop */
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.45)" },
+  loadingScreen: { padding: 20 },
+  skelCard: {
+    width: CARD_WIDTH,
+    height: 300,
+    backgroundColor: "#EAEAEA",
+    borderRadius: 18,
+    alignSelf: "center",
+  },
+  skelLine: {
+    marginTop: 16,
+    width: "70%",
+    height: 14,
+    backgroundColor: "#EAEAEA",
+    borderRadius: 8,
+    alignSelf: "center",
+  },
 
-  /* sheet */
-  sheet: { position: "absolute", left: 0, right: 0, height: SCREEN_H * 0.80, backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, elevation: 14 },
-  sheetHandle: { width: 60, height: 6, borderRadius: 3, backgroundColor: "#E6E6E6", alignSelf: "center", marginTop: 10, marginBottom: 8 },
-  sheetHero: { width: "100%", height: 360 },
-  sheetName: { fontSize: 26, fontFamily: FONT.UI_BOLD, marginTop: 6 },
-  sheetMeta: { fontSize: 12, color: COLORS.MUTED, marginTop: 4 },
+  endScreen: { flex: 1, justifyContent: "center", alignItems: "center" },
+  endText: { fontSize: 20, fontFamily: FONT.UI_BOLD, color: COLORS.MUTED },
 
-  verifiedBadge: { backgroundColor: "#F2E7FF", padding: 8, borderRadius: 10 },
-
-  sheetBadges: { flexDirection: "row", flexWrap: "wrap", marginTop: 10 },
-  sheetBadge: { backgroundColor: "#F3F3F3", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, marginRight: 8, marginBottom: 8 },
-  sheetBadgeText: { fontSize: 12 },
-
-  sectionTitle: { fontSize: 18, fontFamily: FONT.UI_BOLD, marginTop: 18, marginBottom: 8 },
-  photoGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
-  gridPhoto: { width: "48%", height: 160, borderRadius: 12, marginBottom: 12 },
-
-  sheetPrompt: { backgroundColor: "#F6F6F6", padding: 14, borderRadius: 12, marginBottom: 10 },
-  sheetPromptQ: { fontSize: 12, color: COLORS.MUTED },
-  sheetPromptA: { fontSize: 16, fontFamily: FONT.UI_BOLD, marginTop: 6 },
-
-  sheetBio: { fontSize: 15, lineHeight: 22, marginTop: 6 },
-  primarySheetBtn: { marginTop: 18, backgroundColor: COLORS.TEXT, paddingVertical: 14, borderRadius: 999, alignItems: "center" },
-  primarySheetBtnText: { color: "#fff", fontFamily: FONT.UI_BOLD },
-  ghostSheetBtn: { marginTop: 12, paddingVertical: 12, alignItems: "center" },
-  ghostSheetText: { color: COLORS.MUTED },
+  miniTripCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F0F5FF",
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#E1E8FF",
+  },
+  miniTripIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.PRIMARY || "#7C3AED",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  miniTripLabel: {
+    fontSize: 10,
+    fontFamily: FONT.UI_BOLD,
+    color: COLORS.PRIMARY || "#7C3AED",
+    letterSpacing: 0.5,
+  },
+  miniTripDest: {
+    fontSize: 14,
+    fontFamily: FONT.UI_BOLD,
+    color: COLORS.TEXT,
+  },
 });

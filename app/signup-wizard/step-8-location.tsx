@@ -1,20 +1,35 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import WizardProgress from "../../src/components/WizardProgress";
 import { COLORS, FONT } from "../../src/constants/theme";
-
 import { useUser } from "../../src/context/UserContext";
+import { useLocationSearch } from "../../src/hooks/useLocationSearch";
 
 export default function LocationStep() {
     const router = useRouter();
     const { updateProfile } = useUser();
     const [location, setLocation] = useState("");
+    const { results, loading, searchPlaces } = useLocationSearch();
+    const [showResults, setShowResults] = useState(false);
 
     const handleNext = () => {
         updateProfile({ location });
         router.push("/(tabs)/profile");
+    };
+
+    const handleLocationSelect = (item: any) => {
+        const addr = item.address;
+        const city = addr.city || addr.town || addr.village || addr.county || addr.state_district;
+        const state = addr.state;
+        const country = addr.country;
+
+        const parts = [city, state, country].filter(Boolean);
+        const fullLocation = parts.join(", ");
+
+        setLocation(fullLocation);
+        setShowResults(false);
     };
 
     return (
@@ -29,11 +44,41 @@ export default function LocationStep() {
                 <TextInput
                     style={styles.input}
                     value={location}
-                    onChangeText={setLocation}
+                    onChangeText={(text) => {
+                        setLocation(text);
+                        searchPlaces(text);
+                        setShowResults(true);
+                    }}
                     placeholder="Enter your city"
                     placeholderTextColor={COLORS.MUTED}
                 />
             </View>
+
+            {/* SEARCH RESULTS */}
+            {showResults && (location.length > 2) && (
+                <View style={styles.resultsContainer}>
+                    {loading ? (
+                        <ActivityIndicator size="small" color={COLORS.PRIMARY_BTN} style={{ margin: 20 }} />
+                    ) : (
+                        <FlatList
+                            data={results}
+                            keyExtractor={(item: any) => item.place_id.toString()}
+                            keyboardShouldPersistTaps="handled"
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={styles.resultItem}
+                                    onPress={() => handleLocationSelect(item)}
+                                >
+                                    <View>
+                                        <Text style={styles.resultMain}>{item.display_name.split(",")[0]}</Text>
+                                        <Text style={styles.resultSub} numberOfLines={1}>{item.display_name}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+                        />
+                    )}
+                </View>
+            )}
 
             <TouchableOpacity style={styles.currentLocationBtn}>
                 <MaterialCommunityIcons name="crosshairs-gps" size={20} color={COLORS.TEXT} style={{ marginRight: 8 }} />
@@ -95,4 +140,30 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     continueText: { fontFamily: FONT.UI_BOLD, color: COLORS.TEXT, fontSize: 16 },
+
+    resultsContainer: {
+        maxHeight: 300,
+        backgroundColor: "#fff",
+        borderRadius: 12,
+        marginTop: -10,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: "#EAEAEA",
+    },
+    resultItem: {
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: "#F5F5F5",
+    },
+    resultMain: {
+        fontSize: 15,
+        fontFamily: FONT.UI_BOLD,
+        color: COLORS.TEXT,
+    },
+    resultSub: {
+        fontSize: 13,
+        color: COLORS.MUTED,
+        fontFamily: FONT.UI_REGULAR,
+    },
 });

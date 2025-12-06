@@ -1,10 +1,37 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { useRouter } from "expo-router";
-import { COLORS, FONT } from "../src/constants/theme";
+import { useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { IconButton, Provider as PaperProvider } from "react-native-paper";
+import * as yup from "yup";
+import { COLORS, FONT } from "../src/constants/theme";
+
+const signupSchema = yup.object().shape({
+    email: yup.string().email("Invalid email").required("Email is required"),
+    password: yup.string().min(6, "Password must be at least 6 characters").required("Password is required"),
+});
 
 export default function SignupEmail() {
     const router = useRouter();
+    const [showPassword, setShowPassword] = useState(false);
+
+    const {
+        control,
+        handleSubmit,
+        formState: { errors },
+    } = useForm({
+        resolver: yupResolver(signupSchema),
+        defaultValues: {
+            email: "",
+            password: "",
+        },
+    });
+
+    const onSubmit = (data: any) => {
+        console.log("Signup Data:", data);
+        router.push("/signup-wizard/step-1");
+    };
 
     return (
         <PaperProvider>
@@ -22,29 +49,82 @@ export default function SignupEmail() {
                 </View>
 
                 {/* HEADER */}
-                <Text style={styles.headerTitle}>What's your email?</Text>
+                <Text style={styles.headerTitle}>Create your account</Text>
                 <Text style={styles.subHeader}>
-                    We’ll send a verification link to continue.
+                    Enter your email and chose a password to get started.
                 </Text>
 
                 {/* INPUT */}
                 <View style={styles.inputWrapper}>
                     <Text style={styles.label}>Email address</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Enter email"
-                        placeholderTextColor={COLORS.MUTED}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
+                    <Controller
+                        control={control}
+                        name="email"
+                        render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                style={[
+                                    styles.input,
+                                    errors.email && styles.inputError,
+                                ]}
+                                placeholder="Enter email"
+                                placeholderTextColor={COLORS.MUTED}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                            />
+                        )}
                     />
+                    {errors.email && (
+                        <Text style={styles.errorText}>{errors.email.message}</Text>
+                    )}
+                </View>
+
+                {/* PASSWORD INPUT */}
+                <View style={styles.inputWrapper}>
+                    <Text style={styles.label}>Password</Text>
+                    <View
+                        style={[
+                            styles.passwordInputContainer,
+                            errors.password && styles.inputError,
+                        ]}
+                    >
+                        <Controller
+                            control={control}
+                            name="password"
+                            render={({ field: { onChange, onBlur, value } }) => (
+                                <TextInput
+                                    style={styles.passwordInput}
+                                    placeholder="Create a password"
+                                    placeholderTextColor={COLORS.MUTED}
+                                    autoCapitalize="none"
+                                    secureTextEntry={!showPassword}
+                                    onBlur={onBlur}
+                                    onChangeText={onChange}
+                                    value={value}
+                                />
+                            )}
+                        />
+                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                            <IconButton
+                                icon={showPassword ? "eye-off" : "eye"}
+                                size={20}
+                                iconColor={COLORS.MUTED}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                    {errors.password && (
+                        <Text style={styles.errorText}>{errors.password.message}</Text>
+                    )}
                 </View>
 
                 {/* BUTTON */}
                 <TouchableOpacity
                     style={styles.btn}
-                    onPress={() => router.push("/signup-wizard/step-1")}
+                    onPress={handleSubmit(onSubmit)}
                 >
-                    <Text style={styles.btnText}>Verify & Continue</Text>
+                    <Text style={styles.btnText}>Continue</Text>
                 </TouchableOpacity>
 
             </View>
@@ -121,6 +201,36 @@ const styles = StyleSheet.create({
         shadowRadius: 3,
         shadowOffset: { width: 0, height: 1 },
         elevation: 1,
+    },
+    inputError: {
+        borderColor: "#FF4D4F", // Red border for error
+    },
+    errorText: {
+        color: "#FF4D4F",
+        fontSize: 12,
+        marginTop: 4,
+        fontFamily: FONT.UI_REGULAR,
+    },
+
+    passwordInputContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#FFFFFF",
+        borderRadius: 14,
+        borderWidth: 1.4,
+        borderColor: "#D5D5D5",
+        shadowColor: "#000",
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+        shadowOffset: { width: 0, height: 1 },
+        elevation: 1,
+        paddingRight: 8,
+    },
+    passwordInput: {
+        flex: 1,
+        padding: 16,
+        fontFamily: FONT.UI_REGULAR,
+        fontSize: 16,
     },
 
     /* Continue Button */

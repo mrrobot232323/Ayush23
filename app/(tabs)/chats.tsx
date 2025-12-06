@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
 import {
     FlatList,
@@ -57,6 +58,7 @@ const MESSAGES = [
 ];
 
 export default function ChatsScreen() {
+    const router = useRouter();
     const renderMatch = ({ item }: { item: typeof NEW_MATCHES[0] }) => (
         <TouchableOpacity style={styles.matchItem}>
             <Image source={{ uri: item.img }} style={styles.matchAvatar} />
@@ -97,9 +99,17 @@ export default function ChatsScreen() {
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.pageTitle}>Messages</Text>
-                <TouchableOpacity style={styles.iconBtn}>
-                    <MaterialCommunityIcons name="pencil-box-outline" size={26} color={COLORS.TEXT} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row' }}>
+                    <TouchableOpacity
+                        style={[styles.iconBtn, { marginRight: 10 }]}
+                        onPress={() => router.push('/notifications')}
+                    >
+                        <MaterialCommunityIcons name="bell-outline" size={26} color={COLORS.TEXT} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.iconBtn}>
+                        <MaterialCommunityIcons name="pencil-box-outline" size={26} color={COLORS.TEXT} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Search */}

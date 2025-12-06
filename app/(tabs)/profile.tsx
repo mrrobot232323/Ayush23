@@ -1,10 +1,14 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { format } from 'date-fns';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { COLORS, FONT } from '../../src/constants/theme';
+import { COLORS, FONT, STYLE_EMOJIS } from '../../src/constants/theme';
 import { useUser } from '../../src/context/UserContext';
 
 export default function ProfileScreen() {
     const { profile } = useUser();
+    const router = useRouter();
 
     return (
         <SafeAreaView style={styles.container}>
@@ -45,11 +49,34 @@ export default function ProfileScreen() {
                     </View>
                 )}
 
+                {/* Upcoming Trip Section */}
+                {profile.recentTrip && (
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Upcoming Trip ✈️</Text>
+                        </View>
+                        <View style={styles.tripCard}>
+                            <View style={styles.tripIconBox}>
+                                <MaterialCommunityIcons name="airplane" size={24} color={COLORS.PRIMARY || "#7C3AED"} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.tripDest}>{profile.recentTrip.destination}</Text>
+                                <Text style={styles.tripDate}>
+                                    {format(new Date(profile.recentTrip.startDate), "MMM dd")} - {format(new Date(profile.recentTrip.endDate), "MMM dd, yyyy")}
+                                </Text>
+                                <View style={styles.tripBadge}>
+                                    <Text style={styles.tripBadgeText}>{(profile.recentTrip.tripType || "Trip").toUpperCase()}</Text>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+                )}
+
                 {/* Info Section */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>About</Text>
-                        <TouchableOpacity style={styles.editBtn}>
+                        <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/edit-profile')}>
                             <Text style={styles.editText}>Edit</Text>
                         </TouchableOpacity>
                     </View>
@@ -72,16 +99,19 @@ export default function ProfileScreen() {
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>My Vibe</Text>
-                            <TouchableOpacity style={styles.editBtn}>
+                            <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/edit-profile')}>
                                 <Text style={styles.editText}>Edit</Text>
                             </TouchableOpacity>
                         </View>
                         <View style={styles.tagsContainer}>
-                            {profile.styles.map((style, index) => (
-                                <View key={index} style={styles.tag}>
-                                    <Text style={styles.tagText}>{style}</Text>
-                                </View>
-                            ))}
+                            {profile.styles.map((style, index) => {
+                                const emoji = STYLE_EMOJIS[style.toLowerCase()] || "✨";
+                                return (
+                                    <View key={index} style={styles.tag}>
+                                        <Text style={styles.tagText}>{emoji} {style}</Text>
+                                    </View>
+                                );
+                            })}
                         </View>
                     </View>
                 )}
@@ -91,7 +121,7 @@ export default function ProfileScreen() {
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>My Prompts</Text>
-                            <TouchableOpacity style={styles.editBtn}>
+                            <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/edit-profile')}>
                                 <Text style={styles.editText}>Edit</Text>
                             </TouchableOpacity>
                         </View>
@@ -259,5 +289,45 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: FONT.UI_REGULAR,
         color: COLORS.MUTED || 'gray',
+    },
+    tripCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F9FAFB',
+        padding: 16,
+        borderRadius: 16,
+        gap: 16,
+    },
+    tripIconBox: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#F3E8FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    tripDest: {
+        fontSize: 18,
+        fontFamily: FONT.UI_BOLD,
+        color: COLORS.TEXT,
+    },
+    tripDate: {
+        fontSize: 14,
+        fontFamily: FONT.UI_MEDIUM,
+        color: COLORS.MUTED,
+        marginVertical: 4,
+    },
+    tripBadge: {
+        alignSelf: 'flex-start',
+        backgroundColor: COLORS.TEXT,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        marginTop: 4,
+    },
+    tripBadgeText: {
+        fontSize: 10,
+        color: '#fff',
+        fontFamily: FONT.UI_BOLD,
     },
 });

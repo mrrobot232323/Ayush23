@@ -1,5 +1,8 @@
+import { yupResolver } from "@hookform/resolvers/yup";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import {
     KeyboardAvoidingView,
     Platform,
@@ -10,10 +13,34 @@ import {
     View,
 } from "react-native";
 import { IconButton, Provider as PaperProvider } from "react-native-paper";
+import * as yup from "yup";
 import { COLORS, FONT } from "../src/constants/theme";
+
+const loginSchema = yup.object().shape({
+    emailOrPhone: yup.string().required("Email or phone number is required"),
+    password: yup.string().required("Password is required"),
+});
 
 export default function LoginScreen() {
     const router = useRouter();
+    const [showPassword, setShowPassword] = useState(false);
+
+    const {
+        control,
+        handleSubmit,
+        formState: { errors },
+    } = useForm({
+        resolver: yupResolver(loginSchema),
+        defaultValues: {
+            emailOrPhone: "",
+            password: "",
+        },
+    });
+
+    const onSubmit = (data: any) => {
+        console.log("Login Data:", data);
+        router.replace("/(tabs)");
+    };
 
     return (
         <PaperProvider>
@@ -44,16 +71,87 @@ export default function LoginScreen() {
                     {/* Input Field */}
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Phone or Email</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Enter your details"
-                            placeholderTextColor={COLORS.MUTED}
-                            autoCapitalize="none"
+                        <Controller
+                            control={control}
+                            name="emailOrPhone"
+                            render={({ field: { onChange, onBlur, value } }) => (
+                                <TextInput
+                                    style={[
+                                        styles.input,
+                                        errors.emailOrPhone && styles.inputError,
+                                    ]}
+                                    placeholder="Enter your details"
+                                    placeholderTextColor={COLORS.MUTED}
+                                    autoCapitalize="none"
+                                    onBlur={onBlur}
+                                    onChangeText={onChange}
+                                    value={value}
+                                />
+                            )}
                         />
+                        {errors.emailOrPhone && (
+                            <Text style={styles.errorText}>
+                                {errors.emailOrPhone.message}
+                            </Text>
+                        )}
                     </View>
 
+                    {/* Password Input Field */}
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.label}>Password</Text>
+                        <View
+                            style={[
+                                styles.passwordInputContainer,
+                                errors.password && styles.inputError,
+                            ]}
+                        >
+                            <Controller
+                                control={control}
+                                name="password"
+                                render={({ field: { onChange, onBlur, value } }) => (
+                                    <TextInput
+                                        style={styles.passwordInput}
+                                        placeholder="Enter your password"
+                                        placeholderTextColor={COLORS.MUTED}
+                                        autoCapitalize="none"
+                                        secureTextEntry={!showPassword}
+                                        onBlur={onBlur}
+                                        onChangeText={onChange}
+                                        value={value}
+                                    />
+                                )}
+                            />
+                            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                                <IconButton
+                                    icon={showPassword ? "eye-off" : "eye"}
+                                    size={20}
+                                    iconColor={COLORS.MUTED}
+                                />
+                            </TouchableOpacity>
+                        </View>
+                        {errors.password && (
+                            <Text style={styles.errorText}>
+                                {errors.password.message}
+                            </Text>
+                        )}
+                    </View>
+
+                    {/* Forgot Password */}
+                    <TouchableOpacity
+                        style={styles.forgotPasswordContainer}
+                        onPress={() => {
+                            // TODO: Navigate to forgot password screen
+                            console.log("Navigate to Forgot Password");
+                        }}
+                    >
+                        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                    </TouchableOpacity>
+
                     {/* Continue Button */}
-                    <TouchableOpacity style={styles.btn} onPress={() => router.replace("/(tabs)")}>
+                    <TouchableOpacity
+                        style={styles.btn}
+                        onPress={handleSubmit(onSubmit)}
+                    >
                         <Text style={styles.btnText}>Continue</Text>
                     </TouchableOpacity>
 
@@ -84,21 +182,19 @@ const styles = StyleSheet.create({
         position: "absolute",
         top: 60,
         left: 20,
-        zIndex: 20,
+        zIndex: 50,
     },
 
-    /* Floating back icon styling */
     backCircle: {
-        backgroundColor: "#f2ededff",
+        backgroundColor: "#FFFFFF",
         borderRadius: 40,
         margin: 0,
-        elevation: 3,
         shadowColor: "#000",
         shadowOpacity: 0.06,
         shadowRadius: 5,
         shadowOffset: { width: 0, height: 2 },
+        elevation: 3,
     },
-
     content: {
         flex: 1,
         padding: 24,
@@ -136,6 +232,41 @@ const styles = StyleSheet.create({
         fontSize: 16,
         borderWidth: 1.2,
         borderColor: "#DADADA",
+    },
+    inputError: {
+        borderColor: "#FF4D4F", // Red border for error
+    },
+    errorText: {
+        color: "#FF4D4F",
+        fontSize: 12,
+        marginTop: 4,
+        fontFamily: FONT.UI_REGULAR,
+    },
+
+    passwordInputContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#FFFFFF",
+        borderRadius: 14,
+        borderWidth: 1.2,
+        borderColor: "#DADADA",
+        paddingRight: 8,
+    },
+    passwordInput: {
+        flex: 1,
+        padding: 16,
+        fontFamily: FONT.UI_REGULAR,
+        fontSize: 16,
+    },
+
+    forgotPasswordContainer: {
+        alignSelf: "flex-end",
+        marginBottom: 24,
+    },
+    forgotPasswordText: {
+        fontFamily: FONT.UI_MEDIUM,
+        fontSize: 14,
+        color: COLORS.MUTED,
     },
 
     /* Continue Button */
