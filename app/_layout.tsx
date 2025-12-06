@@ -1,24 +1,31 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { useFonts } from "expo-font";
+import { Slot } from "expo-router";
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
+import { UserProvider } from '../src/context/UserContext';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+SplashScreen.preventAutoHideAsync();
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+export default function Layout() {
+  const [loaded, error] = useFonts({
+    "UberMove-Bold": require("../assets/fonts/UberMove-Bold.ttf"),
+    "UberMove-Regular": require("../assets/fonts/UberMove-Regular.ttf"),
+    "UberMoveText-Medium": require("../assets/fonts/UberMoveText-Medium.ttf"),
+    "UberMoveText-Regular": require("../assets/fonts/UberMoveText-Regular.ttf"),
+  });
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  useEffect(() => {
+    // If we had fonts to load, check 'loaded'. Since we commented them out, we proceed.
+    SplashScreen.hideAsync();
+  }, [loaded, error]);
+
+  if (!loaded && !error) {
+    return null;
+  }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <UserProvider>
+      <Slot />
+    </UserProvider>
   );
 }
