@@ -1,147 +1,145 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS, FONT, SIZES } from '../src/constants/theme';
-
-const NOTIFICATIONS = [
-    {
-        id: '1',
-        type: 'match',
-        title: 'It’s a Match!',
-        message: 'You and Sarah liked each other.',
-        time: '2m ago',
-        read: false,
-        avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026024d',
-    },
-    {
-        id: '2',
-        type: 'message',
-        title: 'New Message',
-        message: 'Jake sent you a message.',
-        time: '1h ago',
-        read: false,
-        avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026704d',
-    },
-    {
-        id: '3',
-        type: 'system',
-        title: 'Welcome to meetMiles',
-        message: 'Start exploring new trips today!',
-        time: '1d ago',
-        read: true,
-        icon: 'airplane', // System icon
-    },
-    {
-        id: '4',
-        type: 'match',
-        title: 'New Like',
-        message: 'Someone liked your trip to Bali.',
-        time: '2d ago',
-        read: true,
-        avatar: 'https://i.pravatar.cc/150?u=a048581f4e29026701d',
-    },
-];
-
-const NotificationItem = ({ item, index }: { item: any, index: number }) => {
-    const router = useRouter();
-
-    const getIcon = () => {
-        switch (item.type) {
-            case 'match':
-                return <Ionicons name="heart" size={16} color={COLORS.WHITE} />;
-            case 'message':
-                return <Ionicons name="chatbubble" size={16} color={COLORS.WHITE} />;
-            case 'system':
-            default:
-                return <Ionicons name="notifications" size={16} color={COLORS.WHITE} />;
-        }
-    };
-
-    const getIconColor = () => {
-        switch (item.type) {
-            case 'match':
-                return '#FF4B4B'; // Redish
-            case 'message':
-                return '#4B7BFF'; // Blueish
-            default:
-                return COLORS.PRIMARY_BTN; // Brand
-        }
-    };
-
-    return (
-        <Animated.View
-            entering={FadeInDown.delay(index * 100).springify()}
-            style={[
-                styles.notificationItem,
-                !item.read && styles.unreadItem
-            ]}
-        >
-            <TouchableOpacity
-                style={styles.contentContainer}
-                onPress={() => {
-                    // Handle navigation based on type
-                    if (item.type === 'match') {
-                        router.push('/matches');
-                    } else if (item.type === 'message') {
-                        router.push('/(tabs)/chats');
-                    }
-                }}
-            >
-                <View style={styles.iconContainer}>
-                    {item.avatar ? (
-                        <Image source={{ uri: item.avatar }} style={styles.avatar} />
-                    ) : (
-                        <View style={[styles.systemIcon, { backgroundColor: getIconColor() }]}>
-                            <Ionicons name={item.icon as any || "notifications"} size={22} color={COLORS.TEXT} />
-                        </View>
-                    )}
-
-                    {/* Small Badge Icon */}
-                    {item.avatar && (
-                        <View style={[styles.badge, { backgroundColor: getIconColor() }]}>
-                            {getIcon()}
-                        </View>
-                    )}
-                </View>
-
-                <View style={styles.textContainer}>
-                    <Text style={styles.title}>{item.title}</Text>
-                    <Text style={styles.message} numberOfLines={2}>{item.message}</Text>
-                    <Text style={styles.time}>{item.time}</Text>
-                </View>
-
-                {!item.read && <View style={styles.unreadDot} />}
-            </TouchableOpacity>
-        </Animated.View>
-    );
-};
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+    FlatList,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { COLORS, FONT } from "../src/constants/theme";
+import { useUser } from "../src/context/UserContext";
+import { supabase } from "../src/lib/supabase";
 
 export default function Notifications() {
     const router = useRouter();
+    const { session } = useUser();
+    const [list, setList] = useState<any[]>([]);
+
+    const loadNotifs = async () => {
+        if (!session?.user) return;
+
+        const { data, error } = await supabase
+            .from("notifications")
+            .select("*, sender:profiles(name, photos)")
+            .eq("user_id", session.user.id)
+            .order("created_at", { ascending: false });
+
+        if (!error) setList(data || []);
+    };
+
+    useEffect(() => {
+        if (!session?.user) return;
+        loadNotifs();
+
+        const sub = supabase
+            .channel("notif-realtime")
+            .on(
+                "postgres_changes",
+                { event: "*", schema: "public", table: "notifications" },
+                loadNotifs
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(sub);
+        };
+    }, [session]);
+
+    const openChatForMatch = async (notification: any) => {
+        // Try to find chat for the match between current user and sender
+        if (!notification.sender_id || !session?.user) return router.push("/(tabs)/chats");
+
+        // Search matches table for a match between the two users and then lookup chat
+        const { data: matchRows } = await supabase
+            .from("matches")
+            .select("id, user1, user2")
+            .or(`user1.eq.${session.user.id},user2.eq.${session.user.id}`)
+            .or(`user1.eq.${notification.sender_id},user2.eq.${notification.sender_id}`)
+            .limit(1);
+
+        if (matchRows && matchRows.length > 0) {
+            const matchId = matchRows[0].id;
+            const { data: chatRows } = await supabase.from("chats").select("id").eq("match_id", matchId).limit(1);
+            if (chatRows && chatRows.length > 0) {
+                return router.push(`/chat-room?chat=${chatRows[0].id}&other=${notification.sender_id}`);
+            }
+        }
+
+        // fallback
+        router.push("/(tabs)/chats");
+    };
+
+    const renderNotification = ({ item, index }: { item: any, index: number }) => {
+        const avatar = item.sender?.photos?.[0];
+
+        return (
+            <Animated.View
+                entering={FadeInDown.delay(index * 80).springify()}
+                style={styles.card}
+            >
+                <View style={styles.row}>
+                    <View>
+                        {avatar ? (
+                            <Image source={{ uri: avatar }} style={styles.avatar} />
+                        ) : (
+                            <View style={styles.avatarPlaceholder}>
+                                <Ionicons name="person" size={26} color="#fff" />
+                            </View>
+                        )}
+                    </View>
+
+                    <View style={{ marginLeft: 14, flex: 1 }}>
+                        <Text style={styles.title}>{item.title}</Text>
+                        <Text style={styles.msg}>{item.message}</Text>
+                        <Text style={styles.time}>
+                            {new Date(item.created_at).toLocaleTimeString()}
+                        </Text>
+                    </View>
+
+                    {item.type === "match" ? (
+                        <TouchableOpacity style={styles.chatBtn} onPress={() => openChatForMatch(item)}>
+                            <Ionicons name="chatbubble-ellipses" size={18} color="#fff" />
+                        </TouchableOpacity>
+                    ) : null}
+                </View>
+            </Animated.View>
+        );
+    };
+
+
+
+    const uniqueList = useMemo(() => {
+        const seen = new Set();
+        return list.filter(item => {
+            const id = String(item.id);
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+        });
+    }, [list]);
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.wrapper}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                <TouchableOpacity onPress={() => router.back()}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.TEXT} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Notifications</Text>
-                <TouchableOpacity>
-                    <Ionicons name="ellipsis-horizontal" size={24} color={COLORS.TEXT} />
-                </TouchableOpacity>
+                <Text style={styles.headerText}>Notifications</Text>
+                <Ionicons name="ellipsis-horizontal" size={24} color={COLORS.TEXT} />
             </View>
 
             <FlatList
-                data={NOTIFICATIONS}
+                data={uniqueList}
                 keyExtractor={(item) => item.id}
-                renderItem={({ item, index }) => <NotificationItem item={item} index={index} />}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
+                renderItem={renderNotification}
+                contentContainerStyle={{ padding: 16 }}
                 ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
+                    <View style={styles.empty}>
                         <Ionicons name="notifications-off-outline" size={64} color={COLORS.MUTED} />
                         <Text style={styles.emptyText}>No notifications yet</Text>
                     </View>
@@ -152,118 +150,52 @@ export default function Notifications() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.BG,
-    },
+    wrapper: { flex: 1, backgroundColor: COLORS.BG },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: SIZES.spacing,
-        paddingVertical: 16,
-        backgroundColor: COLORS.BG,
+        padding: 16,
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
     },
-    backButton: {
-        padding: 4,
-    },
-    headerTitle: {
-        fontFamily: FONT.UI_BOLD,
+    headerText: {
         fontSize: 20,
+        fontFamily: FONT.UI_BOLD,
         color: COLORS.TEXT,
     },
-    listContent: {
-        padding: SIZES.spacing,
-    },
-    notificationItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        marginBottom: 12,
+
+    card: {
+        padding: 14,
         backgroundColor: COLORS.WHITE,
-        borderRadius: SIZES.radius,
-        // Shadow
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
+        borderRadius: 12,
+        marginBottom: 12,
         elevation: 2,
     },
-    unreadItem: {
-        borderLeftWidth: 4,
-        borderLeftColor: COLORS.PRIMARY_BTN,
-    },
-    contentContainer: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    iconContainer: {
-        position: 'relative',
-        marginRight: 16,
-    },
+    row: { flexDirection: "row", alignItems: "center" },
+
     avatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: COLORS.BORDER,
+        width: 52,
+        height: 52,
+        borderRadius: 26,
     },
-    systemIcon: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    badge: {
-        position: 'absolute',
-        bottom: -2,
-        right: -2,
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: COLORS.WHITE,
-    },
-    textContainer: {
-        flex: 1,
-    },
-    title: {
-        fontFamily: FONT.UI_BOLD,
-        fontSize: 16,
-        color: COLORS.TEXT,
-        marginBottom: 2,
-    },
-    message: {
-        fontFamily: FONT.UI_REGULAR,
-        fontSize: 14,
-        color: COLORS.MUTED,
-        marginBottom: 4,
-    },
-    time: {
-        fontFamily: FONT.UI_REGULAR,
-        fontSize: 12,
-        color: '#999',
-    },
-    unreadDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
+    avatarPlaceholder: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
         backgroundColor: COLORS.PRIMARY_BTN,
-        marginLeft: 8,
+        justifyContent: "center",
+        alignItems: "center",
     },
-    emptyContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 100,
+
+    title: { fontSize: 16, fontFamily: FONT.UI_BOLD, color: COLORS.TEXT },
+    msg: { fontSize: 14, color: COLORS.MUTED, marginTop: 2 },
+    time: { fontSize: 12, color: "#999", marginTop: 4 },
+
+    chatBtn: {
+        padding: 8,
+        backgroundColor: COLORS.PRIMARY_BTN,
+        borderRadius: 10,
     },
-    emptyText: {
-        fontFamily: FONT.UI_MEDIUM,
-        fontSize: 16,
-        color: COLORS.MUTED,
-        marginTop: 16,
-    },
+
+    empty: { marginTop: 100, alignItems: "center" },
+    emptyText: { marginTop: 14, fontSize: 16, color: COLORS.MUTED },
 });

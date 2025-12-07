@@ -1,14 +1,14 @@
 export const COLORS = {
-    BG: "#F3F3F3",
+    BG: "#FFFFFF",
     TEXT: "#191A23",
     PRIMARY_BTN: "#B9FF66",
     WHITE: "#FFFFFF",
-    CARD: "#FAFAFA",
+    CARD: "#F9F9F9",
     MUTED: "#6A6A6A",
-    LINK: "#0C131E",
-    BLUE_HEADLINE: "#0c131e", // similar to your Blue
-    BORDER: "#E0E0E0",
-    PRIMARY: "#7C3AED",
+    LINK: "#2F80ED",
+    BLUE_HEADLINE: "#191A23",
+    BORDER: "#EEEEEE",
+    PRIMARY: "#2F80ED", // Changed to Blue
 };
 
 export const FONT = {

@@ -1,23 +1,32 @@
-import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Dimensions, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useEffect, useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { FONT } from "../src/constants/theme";
+import { useUser } from "../src/context/UserContext";
+import { useNavigation } from "../src/utils/navigation";
+import { ROUTES } from "../src/constants/routes";
 
-const { width, height } = Dimensions.get('window');
-
-const BRAND_GREEN = "#B9FF66";
-const TEXT_COLOR = "#191A23";
-const LOVE_COLOR = "#bd2461ff"; // romantic love color
+// --- THEME COLORS ---
+const BRAND_GREEN = "#B9FF66"; 
+const TEXT_COLOR = "#191A23";  
+const BLUE_HIGHLIGHT = "#0057ff"; // Blue for "Destination"
 
 export default function LandingScreen() {
-    const router = useRouter();
+    const nav = useNavigation();
+    const { session } = useUser();
 
     // -------------------------
     // Typing Effect
     // -------------------------
-    const fullText = "Meet Someone Worth the Mile";
+    // Updated text as requested
+    const fullText = "Looks Not Matter Destination Does"; 
     const [typedText, setTypedText] = useState("");
+
+    useEffect(() => {
+        if (session) {
+            nav.replace(ROUTES.TABS.ROOT);
+        }
+    }, [session]);
 
     useEffect(() => {
         let index = 0;
@@ -33,77 +42,70 @@ export default function LandingScreen() {
         return () => clearInterval(interval);
     }, []);
 
-    // Split the text to color ONLY "Someone"
+    // Split the text to color specific words
     const renderTypedHeadline = () => {
         const parts = typedText.split(" ");
 
         return (
             <Text style={styles.headline}>
-              {parts.map((word, i) => {
-    if (word === "Someone") {
-        return (
-            <Text key={i} style={styles.glowText}>
-                {word + " "}
-            </Text>
-        );
-    }
-    return word + " ";
-})}
-
-
+                {parts.map((word, i) => {
+                    // Logic: Highlight "Destination" in Blue
+                    // We also check for the last "Does" if you want that blue too, 
+                    // but usually highlighting the main noun looks best.
+                    if (word === "Destination") {
+                        return (
+                            <Text key={i} style={styles.glowText}>
+                                {word + " "}
+                            </Text>
+                        );
+                    }
+                    return word + " ";
+                })}
             </Text>
         );
     };
 
     return (
         <View style={styles.container}>
-            <StatusBar style="light" />
+            <StatusBar style="dark" />
 
-            <ImageBackground
-                source={{ uri: "https://images.unsplash.com/photo-1516585427167-18e461a336bf?q=80&w=2787&auto=format&fit=crop" }}
-                style={styles.background}
-                resizeMode="cover"
-            >
-                <View style={styles.overlay} />
+            <View style={styles.contentContainer}>
 
-                <View style={styles.contentContainer}>
-
-                    {/* HEADER */}
-                    <View style={styles.header}>
-                        <Text style={styles.logoText}>MeetMiles</Text>
-                        <Text style={styles.subLogoText}>Where Real Connections Begin</Text>
-                    </View>
-
-                    {/* HEADLINE WITH TYPING */}
-                    <View style={styles.headlineContainer}>{renderTypedHeadline()}</View>
-
-                    {/* ACTION BUTTONS */}
-                    <View style={styles.actionContainer}>
-
-                        {/* PRIMARY BUTTON */}
-                        <TouchableOpacity
-                            style={styles.primaryBtn}
-                            onPress={() => router.push("/signup-email")}
-                        >
-                            <Text style={styles.primaryBtnText}>Create an account</Text>
-                        </TouchableOpacity>
-
-                        {/* SECONDARY BUTTON */}
-                        <TouchableOpacity
-                            style={styles.secondaryBtn}
-                            onPress={() => router.push("/login")}
-                        >
-                            <Text style={styles.secondaryBtnText}>I have an account</Text>
-                        </TouchableOpacity>
-
-                        <Text style={styles.termsText}>
-                            By signing up, you agree to our <Text style={{ textDecorationLine: 'underline' }}>Terms</Text>.
-                            See how we use your data in our <Text style={{ textDecorationLine: 'underline' }}>Privacy Policy</Text>.
-                        </Text>
-                    </View>
-
+                {/* HEADER */}
+                <View style={styles.header}>
+                    <Text style={styles.logoText}>MeetMiles</Text>
+                    <Text style={styles.subLogoText}>Where Real Connections Begin</Text>
                 </View>
-            </ImageBackground>
+
+                {/* HEADLINE WITH TYPING */}
+                <View style={styles.headlineContainer}>{renderTypedHeadline()}</View>
+
+                {/* ACTION BUTTONS */}
+                <View style={styles.actionContainer}>
+
+                    {/* PRIMARY BUTTON (Green) */}
+                    <TouchableOpacity
+                        style={styles.primaryBtn}
+                        onPress={() => nav.navigate(ROUTES.SIGNUP_EMAIL)}
+                    >
+                        <Text style={styles.primaryBtnText}>Create an account</Text>
+                    </TouchableOpacity>
+
+                    {/* SECONDARY BUTTON (White) */}
+                    <TouchableOpacity
+                        style={styles.secondaryBtn}
+                        onPress={() => nav.navigate(ROUTES.LOGIN)}
+                    >
+                        <Text style={styles.secondaryBtnText}>I have an account</Text>
+                    </TouchableOpacity>
+
+                    <Text style={styles.termsText}>
+                        By signing up, you agree to our <Text style={{ textDecorationLine: 'underline' }}>Terms</Text>.
+                        See how we use your data in our <Text style={{ textDecorationLine: 'underline' }}>Privacy Policy</Text>.
+                    </Text>
+                </View>
+
+            </View>
         </View>
     );
 }
@@ -111,16 +113,7 @@ export default function LandingScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F3F3F3',
-    },
-    background: {
-        width: width,
-        height: height,
-        flex: 1,
-    },
-    overlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.25)',
+        backgroundColor: '#FFFFFF',
     },
     contentContainer: {
         flex: 1,
@@ -153,11 +146,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
     },
     headline: {
-        fontSize: 46,
+        fontSize: 46, // Adjusted size slightly for longer text
         fontFamily: FONT.UI_BOLD,
         color: TEXT_COLOR,
         textAlign: 'center',
-        lineHeight: 50,
+        lineHeight: 52,
     },
     actionContainer: {
         width: '100%',
@@ -175,12 +168,11 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
     glowText: {
-    color: LOVE_COLOR,
-    textShadowColor: LOVE_COLOR,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 12, // glow strength
-},
-
+        color: BLUE_HIGHLIGHT,
+        textShadowColor: BLUE_HIGHLIGHT,
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 12, 
+    },
     primaryBtnText: {
         fontFamily: FONT.UI_BOLD,
         color: TEXT_COLOR,

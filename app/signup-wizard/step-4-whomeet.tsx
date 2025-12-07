@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import WizardProgress from "../../src/components/WizardProgress";
 import { COLORS, FONT } from "../../src/constants/theme";
+import { useUser } from "../../src/context/UserContext";
 
 export default function WhoMeetStep() {
     const router = useRouter();
@@ -23,6 +24,8 @@ export default function WhoMeetStep() {
         return acc;
     }, {} as Record<string, Animated.Value>)).current;
 
+    const { updateProfile } = useUser();
+
     const toggle = (o: string) => {
         const anim = scaleAnim[o];
 
@@ -33,6 +36,19 @@ export default function WhoMeetStep() {
 
         if (selected.includes(o)) setSelected(selected.filter(x => x !== o));
         else setSelected([...selected, o]);
+    };
+
+    const handleNext = () => {
+        // If openToAll, default to all options or specific flag?
+        // Let's just pass options if openToAll, or keep it empty/all. 
+        // Logic: if openToAll, usually implies everyone. 
+        // For matching simplicity, we can set interestedIn to ["Men", "Women", "Nonbinary people"]
+        // OR handle 'openToAll' logic specifically.
+        // Let's explicitly save the list.
+
+        const finalSelection = openToAll ? options : selected;
+        updateProfile({ interestedIn: finalSelection });
+        router.push("/signup-wizard/step-4-occupation");
     };
 
     return (
@@ -100,7 +116,7 @@ export default function WhoMeetStep() {
             {/* Floating Next Button */}
             <TouchableOpacity
                 style={styles.nextBtn}
-                onPress={() => router.push("/signup-wizard/step-4-occupation")}
+                onPress={handleNext}
             >
                 <MaterialCommunityIcons name="arrow-right" size={26} color="#fff" />
             </TouchableOpacity>

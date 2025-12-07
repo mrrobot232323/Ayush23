@@ -11,14 +11,25 @@ import {
 } from "react-native";
 import WizardProgress from "../../src/components/WizardProgress";
 import { COLORS, FONT } from "../../src/constants/theme";
-
 import { useUser } from "../../src/context/UserContext";
+import { supabase } from "../../src/lib/supabase";
 
 export default function PhotosStep() {
     const router = useRouter();
-    const { updateProfile } = useUser();
+    const { updateProfile, session, profile } = useUser();
 
     const [photos, setPhotos] = useState<(string | null)[]>(Array(6).fill(null));
+
+    // Load existing photos from profile
+    React.useEffect(() => {
+        if (profile.photos && profile.photos.length > 0) {
+            const existing = [...profile.photos];
+            const filled = Array(6).fill(null).map((_, i) => existing[i] || null);
+            setPhotos(filled);
+        }
+    }, [profile.photos]);
+
+    const [uploading, setUploading] = useState(false);
     const scaleAnim = new Animated.Value(1);
 
     const animate = () => {
@@ -28,37 +39,86 @@ export default function PhotosStep() {
         ]).start();
     };
 
+    /* -------------------- UPLOAD TO SUPABASE STORAGE -------------------- */
+    const uploadToSupabase = async (uri: string) => {
+        if (!session?.user) return null;
+
+        try {
+            setUploading(true);
+
+            const response = await fetch(uri);
+            const blob = await response.blob();
+
+            const fileName = `${session.user.id}/${Date.now()}.jpg`;
+
+            const { error } = await supabase.storage
+                .from("user_photos")
+                .upload(fileName, blob, {
+                    contentType: "image/jpeg",
+                });
+
+            if (error) {
+                console.log("Upload Error:", error);
+                setUploading(false);
+                return null;
+            }
+
+            // GET PUBLIC URL
+            const { data } = supabase.storage
+                .from("user_photos")
+                .getPublicUrl(fileName);
+
+            setUploading(false);
+            return data.publicUrl;
+        } catch (err) {
+            console.log("Upload Failed:", err);
+            setUploading(false);
+            return null;
+        }
+    };
+
+    /* -------------------- PICK IMAGE -------------------- */
     const pickImage = async (index: number) => {
         animate();
 
         let result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.All,
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
             aspect: [4, 5],
-            quality: 1,
+            quality: 0.9,
         });
 
         if (!result.canceled) {
-            const newPhotos = [...photos];
-            newPhotos[index] = result.assets[0].uri;
-            setPhotos(newPhotos);
+            const localUri = result.assets[0].uri;
+
+            // Upload to Supabase + get public URL
+            const publicUrl = await uploadToSupabase(localUri);
+
+            if (publicUrl) {
+                const newPhotos = [...photos];
+                newPhotos[index] = publicUrl;
+                setPhotos(newPhotos);
+            }
         }
     };
 
+    /* -------------------- DELETE PHOTO -------------------- */
     const deletePhoto = (index: number) => {
         const copy = [...photos];
         copy[index] = null;
         setPhotos(copy);
     };
 
-    const filledCount = photos.filter(Boolean).length;
-
+    /* -------------------- NEXT BUTTON -------------------- */
     const handleNext = () => {
-        // Filter out null values to only save actual URIs
         const validPhotos = photos.filter((p): p is string => p !== null);
+
         updateProfile({ photos: validPhotos });
+
         router.push("/signup-wizard/step-8-location");
     };
+
+    const filledCount = photos.filter(Boolean).length;
 
     return (
         <View style={styles.container}>
@@ -74,12 +134,12 @@ export default function PhotosStep() {
                         activeOpacity={0.8}
                         onPress={() => pickImage(index)}
                         style={styles.card}
+                        disabled={uploading}
                     >
                         {uri ? (
                             <>
                                 <Image source={{ uri }} style={styles.image} />
 
-                                {/* Delete Button */}
                                 <TouchableOpacity
                                     style={styles.deleteBtn}
                                     onPress={() => deletePhoto(index)}
@@ -89,26 +149,27 @@ export default function PhotosStep() {
                             </>
                         ) : (
                             <View style={styles.placeholder}>
-                                <Text style={styles.plus}>＋</Text>
-                                <Text style={styles.smallText}>Add Photo</Text>
+                                <Text style={styles.plus}>{uploading ? "..." : "＋"}</Text>
+                                <Text style={styles.smallText}>
+                                    {uploading ? "Uploading..." : "Add Photo"}
+                                </Text>
                             </View>
                         )}
                     </TouchableOpacity>
                 ))}
             </View>
 
-            {/* Info Text */}
             <Text style={styles.info}>
                 Tap a tile to upload. Long press to reorder (coming soon).
             </Text>
 
-            {/* Continue Button (Floating) */}
+            {/* Continue */}
             <TouchableOpacity
-                disabled={filledCount < 2}
+                disabled={filledCount < 2 || uploading}
                 onPress={handleNext}
                 style={[
                     styles.fab,
-                    filledCount < 2 && styles.fabDisabled
+                    (filledCount < 2 || uploading) && styles.fabDisabled
                 ]}
             >
                 <Text style={styles.fabArrow}>{">"}</Text>
@@ -118,13 +179,8 @@ export default function PhotosStep() {
 }
 
 /* -------------------- STYLES -------------------- */
-
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.BG,
-        padding: 20,
-    },
+    container: { flex: 1, backgroundColor: COLORS.BG, padding: 20 },
 
     header: {
         fontSize: 28,
@@ -169,11 +225,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
 
-    plus: {
-        fontSize: 32,
-        color: "#191A23",
-        marginBottom: 4,
-    },
+    plus: { fontSize: 32, color: "#191A23", marginBottom: 4 },
 
     smallText: {
         fontSize: 12,
@@ -193,12 +245,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
 
-    deleteText: {
-        color: "#fff",
-        fontSize: 18,
-        marginTop: -2,
-        fontWeight: "bold",
-    },
+    deleteText: { color: "#fff", fontSize: 18, marginTop: -2, fontWeight: "bold" },
 
     info: {
         textAlign: "center",
@@ -208,7 +255,6 @@ const styles = StyleSheet.create({
         fontFamily: FONT.UI_REGULAR,
     },
 
-    /* Floating Continue Button */
     fab: {
         position: "absolute",
         bottom: 26,
@@ -219,10 +265,6 @@ const styles = StyleSheet.create({
         backgroundColor: "#191A23",
         alignItems: "center",
         justifyContent: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
         elevation: 6,
     },
 
@@ -230,9 +272,5 @@ const styles = StyleSheet.create({
         backgroundColor: "#BDBDBD",
     },
 
-    fabArrow: {
-        color: "#FFF",
-        fontSize: 26,
-        marginLeft: 2,
-    },
+    fabArrow: { color: "#FFF", fontSize: 26, marginLeft: 2 },
 });

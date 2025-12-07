@@ -49,7 +49,7 @@ export default function ProfileDetailScreen() {
                 <View style={styles.detailsContainer}>
                     <View style={styles.topMeta}>
                         <Text style={styles.name}>{p.name}</Text>
-                        {p.verified && <MaterialCommunityIcons name="check-decagram" size={20} color={COLORS.PRIMARY || "#7C3AED"} style={{ marginLeft: 6 }} />}
+                        {p.verified && <MaterialCommunityIcons name="check-decagram" size={20} color={COLORS.PRIMARY} style={{ marginLeft: 6 }} />}
                     </View>
                     <Text style={styles.subtitle}>{p.distanceKm !== undefined ? `${p.distanceKm} km away` : ''} {p.pronouns ? `• ${p.pronouns}` : ''}</Text>
 
@@ -69,7 +69,7 @@ export default function ProfileDetailScreen() {
                     {p.recentTrip && (
                         <View style={styles.tripContainer}>
                             <View style={styles.tripHeader}>
-                                <MaterialCommunityIcons name="airplane-takeoff" size={20} color={COLORS.PRIMARY || "#7C3AED"} />
+                                <MaterialCommunityIcons name="airplane-takeoff" size={20} color={COLORS.PRIMARY} />
                                 <Text style={styles.tripTitle}>Upcoming Trip</Text>
                             </View>
                             <View style={styles.tripCard}>
@@ -81,7 +81,11 @@ export default function ProfileDetailScreen() {
                                 <View style={styles.tripContent}>
                                     <Text style={styles.tripDest}>{p.recentTrip.destination}</Text>
                                     <Text style={styles.tripDate}>
-                                        {format(new Date(p.recentTrip.startDate), "MMM dd")} - {format(new Date(p.recentTrip.endDate), "MMM dd")}
+                                        {p.recentTrip.startDate && p.recentTrip.endDate ? (
+                                            `${format(new Date(p.recentTrip.startDate), "MMM dd")} - ${format(new Date(p.recentTrip.endDate), "MMM dd")}`
+                                        ) : (
+                                            "Date TBD"
+                                        )}
                                     </Text>
                                     <View style={styles.tripBadge}>
                                         <Text style={styles.tripBadgeText}>{(p.recentTrip.tripType || "Trip")}</Text>

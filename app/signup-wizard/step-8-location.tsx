@@ -2,10 +2,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import SuccessModal from "../../src/components/SuccessModal";
 import WizardProgress from "../../src/components/WizardProgress";
 import { COLORS, FONT } from "../../src/constants/theme";
 import { useUser } from "../../src/context/UserContext";
 import { useLocationSearch } from "../../src/hooks/useLocationSearch";
+
 
 export default function LocationStep() {
     const router = useRouter();
@@ -13,9 +15,21 @@ export default function LocationStep() {
     const [location, setLocation] = useState("");
     const { results, loading, searchPlaces } = useLocationSearch();
     const [showResults, setShowResults] = useState(false);
+    const [isSuccessVisible, setIsSuccessVisible] = useState(false);
+
+    // Ensure modal is hidden on mount
+    React.useEffect(() => {
+        setIsSuccessVisible(false);
+    }, []);
 
     const handleNext = () => {
+        if (!location) return;
         updateProfile({ location });
+        setIsSuccessVisible(true);
+    };
+
+    const onFinish = () => {
+        setIsSuccessVisible(false);
         router.push("/(tabs)/profile");
     };
 
@@ -92,6 +106,15 @@ export default function LocationStep() {
             >
                 <Text style={styles.continueText}>Continue</Text>
             </TouchableOpacity>
+
+            {/* Success Modal */}
+            <SuccessModal
+                visible={isSuccessVisible}
+                onClose={onFinish}
+                title="Profile Ready!"
+                subtitle="Your profile has been created successfully. Let's find your travel partner."
+                buttonText="Start Exploring"
+            />
         </View>
     );
 }

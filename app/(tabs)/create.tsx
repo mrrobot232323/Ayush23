@@ -106,8 +106,8 @@ export default function CreateTripScreen() {
             if (editingTrip) {
                 setValue('destination', editingTrip.destination);
                 setValue('tripType', editingTrip.tripType);
-                setStartDate(new Date(editingTrip.startDate));
-                setEndDate(new Date(editingTrip.endDate));
+                setStartDate(editingTrip.startDate ? new Date(editingTrip.startDate) : new Date());
+                setEndDate(editingTrip.endDate ? new Date(editingTrip.endDate) : new Date(Date.now() + 86400000));
                 // We don't verify country on edit start, but validation will run on submit using string parsing if variable is null
                 setSelectedCountry(null);
             } else {
@@ -244,7 +244,7 @@ export default function CreateTripScreen() {
                     </View>
                 </View>
                 <Text style={styles.tripListDate}>
-                    {format(new Date(item.startDate), "MMM dd")} - {format(new Date(item.endDate), "MMM dd, yyyy")}
+                    {item.startDate ? format(new Date(item.startDate), "MMM dd") : ""} - {item.endDate ? format(new Date(item.endDate), "MMM dd, yyyy") : ""}
                 </Text>
             </View>
 
@@ -263,8 +263,8 @@ export default function CreateTripScreen() {
     // Filter Trips
     const now = new Date();
     const trips = profile.trips || [];
-    const upcomingTrips = trips.filter(t => new Date(t.startDate) >= now);
-    const pastTrips = trips.filter(t => new Date(t.startDate) < now);
+    const upcomingTrips = trips.filter(t => t.startDate && new Date(t.startDate) >= now);
+    const pastTrips = trips.filter(t => t.startDate && new Date(t.startDate) < now);
     const displayTrips = activeTab === 'upcoming' ? upcomingTrips : pastTrips;
 
     return (
@@ -301,7 +301,7 @@ export default function CreateTripScreen() {
                     <FlatList
                         data={displayTrips}
                         renderItem={renderTripItem}
-                        keyExtractor={item => item.id}
+                        keyExtractor={(item, index) => item.id ?? index.toString()}
                         contentContainerStyle={styles.listContent}
                         ListEmptyComponent={
                             <View style={styles.emptyState}>
@@ -332,7 +332,7 @@ export default function CreateTripScreen() {
                             <Text style={styles.subtitle}>{editingTrip ? "Update your plans." : "Plan your next adventure together."}</Text>
                         </View>
                         <View style={styles.iconBox}>
-                            <MaterialCommunityIcons name="airplane-takeoff" size={28} color={COLORS.PRIMARY || "#7C3AED"} />
+                            <MaterialCommunityIcons name="airplane-takeoff" size={28} color={COLORS.PRIMARY} />
                         </View>
                     </View>
 
@@ -342,7 +342,7 @@ export default function CreateTripScreen() {
                         <View style={styles.inputGroup}>
                             <Text style={styles.inputLabel}>DESTINATION</Text>
                             <View style={[styles.inputContainer, errors.destination && { borderColor: "red", borderWidth: 1 }]}>
-                                <MaterialCommunityIcons name="map-marker-outline" size={22} color={COLORS.MUTED} style={styles.inputIcon} />
+                                <MaterialCommunityIcons name="map-marker-outline" size={24} color={COLORS.MUTED} style={styles.inputIcon} />
                                 <Controller
                                     control={control}
                                     name="destination"
@@ -390,7 +390,7 @@ export default function CreateTripScreen() {
 
                                                     {loading ? (
                                                         <View style={{ paddingTop: 40, alignItems: "center" }}>
-                                                            <ActivityIndicator size="large" color={COLORS.PRIMARY || "#7C3AED"} />
+                                                            <ActivityIndicator size="large" color={COLORS.PRIMARY} />
                                                         </View>
                                                     ) : (
                                                         <FlatList
@@ -587,22 +587,19 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#fff",
+        backgroundColor: "#F7F7F7",
         borderRadius: 16,
         paddingHorizontal: 16,
-        height: 60,
-        elevation: 2,
-        shadowColor: "#000",
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 4 },
+        height: 64,
+        borderWidth: 1,
+        borderColor: "#E0E0E0",
     },
     inputIcon: {
-        marginRight: 12,
+        marginRight: 14,
     },
     input: {
         flex: 1,
-        fontSize: 16,
+        fontSize: 17,
         fontFamily: FONT.UI_MEDIUM,
         color: COLORS.TEXT,
     },
@@ -616,13 +613,12 @@ const styles = StyleSheet.create({
         flex: 1,
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#fff",
+        backgroundColor: "#F7F7F7",
         borderRadius: 16,
         paddingHorizontal: 12,
-        height: 60,
-        elevation: 1,
+        height: 64,
         borderWidth: 1,
-        borderColor: "#f0f0f0",
+        borderColor: "#E0E0E0",
     },
     dateText: {
         fontSize: 15,
@@ -663,7 +659,7 @@ const styles = StyleSheet.create({
 
     createBtn: {
         marginTop: 30,
-        backgroundColor: COLORS.PRIMARY || "#7C3AED",
+        backgroundColor: COLORS.PRIMARY,
         height: 60,
         borderRadius: 16,
         alignItems: "center",

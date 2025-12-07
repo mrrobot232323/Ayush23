@@ -1,9 +1,10 @@
 import { yupResolver } from "@hookform/resolvers/yup";
-import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
+    ActivityIndicator, Alert,
+    BackHandler,
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
@@ -14,7 +15,10 @@ import {
 } from "react-native";
 import { IconButton, Provider as PaperProvider } from "react-native-paper";
 import * as yup from "yup";
+import { ROUTES } from "../src/constants/routes";
 import { COLORS, FONT } from "../src/constants/theme";
+import { supabase } from "../src/lib/supabase";
+import { useNavigation } from "../src/utils/navigation";
 
 const loginSchema = yup.object().shape({
     emailOrPhone: yup.string().required("Email or phone number is required"),
@@ -22,8 +26,25 @@ const loginSchema = yup.object().shape({
 });
 
 export default function LoginScreen() {
-    const router = useRouter();
+    const nav = useNavigation();
     const [showPassword, setShowPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    // Handle Hardware Back Button
+    useEffect(() => {
+        const backAction = () => {
+            // Prevent going back to protected routes (like Profile) if user logged out
+            nav.replace(ROUTES.LANDING);
+            return true;
+        };
+
+        const backHandler = BackHandler.addEventListener(
+            "hardwareBackPress",
+            backAction
+        );
+
+        return () => backHandler.remove();
+    }, []);
 
     const {
         control,
@@ -37,9 +58,24 @@ export default function LoginScreen() {
         },
     });
 
-    const onSubmit = (data: any) => {
-        console.log("Login Data:", data);
-        router.replace("/(tabs)");
+    const onSubmit = async (data: any) => {
+        setLoading(true);
+        const { emailOrPhone, password } = data;
+
+        // Assuming email for now. Supabase signInWithPassword expects email.
+        const { error } = await supabase.auth.signInWithPassword({
+            email: emailOrPhone,
+            password: password,
+        });
+
+        setLoading(false);
+
+        if (error) {
+            Alert.alert("Login Failed", error.message);
+        } else {
+            console.log("Login Successful");
+            nav.replace(ROUTES.TABS.ROOT);
+        }
     };
 
     return (
@@ -57,7 +93,7 @@ export default function LoginScreen() {
                         size={22}
                         iconColor="#191A23"
                         style={styles.backCircle}
-                        onPress={() => router.back()}
+                        onPress={() => nav.replace(ROUTES.LANDING)}
                     />
                 </View>
 
@@ -151,13 +187,18 @@ export default function LoginScreen() {
                     <TouchableOpacity
                         style={styles.btn}
                         onPress={handleSubmit(onSubmit)}
+                        disabled={loading}
                     >
-                        <Text style={styles.btnText}>Continue</Text>
+                        {loading ? (
+                            <ActivityIndicator color="#191A23" />
+                        ) : (
+                            <Text style={styles.btnText}>Continue</Text>
+                        )}
                     </TouchableOpacity>
 
                     {/* Footer */}
                     <View style={styles.footer}>
-                        <TouchableOpacity onPress={() => router.push("/signup-email")}>
+                        <TouchableOpacity onPress={() => nav.navigate(ROUTES.SIGNUP_EMAIL)}>
                             <Text style={styles.linkText}>
                                 Don't have an account?{" "}
                                 <Text style={{ color: "#293b14ff" }}>Sign up</Text>

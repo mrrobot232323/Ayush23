@@ -2,10 +2,12 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { IconButton, Provider as PaperProvider } from "react-native-paper";
 import * as yup from "yup";
+import SuccessModal from "../src/components/SuccessModal";
 import { COLORS, FONT } from "../src/constants/theme";
+import { supabase } from "../src/lib/supabase";
 
 const signupSchema = yup.object().shape({
     email: yup.string().email("Invalid email").required("Email is required"),
@@ -15,6 +17,8 @@ const signupSchema = yup.object().shape({
 export default function SignupEmail() {
     const router = useRouter();
     const [showPassword, setShowPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
 
     const {
         control,
@@ -28,8 +32,56 @@ export default function SignupEmail() {
         },
     });
 
-    const onSubmit = (data: any) => {
-        console.log("Signup Data:", data);
+    const onSubmit = async (data: any) => {
+        setIsLoading(true);
+        try {
+            // 1. Sign up with Supabase
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: data.email,
+                password: data.password,
+            });
+
+            if (authError) {
+                // Supabase error for existing user (when email confirm is OFF)
+                if (authError.message.includes("User already registered") || authError.message.includes("already registered")) {
+                    Alert.alert("Account Exists", "This email is already registered. Please login instead.");
+                } else {
+                    Alert.alert("Signup Failed", authError.message);
+                }
+                setIsLoading(false);
+                return;
+            }
+
+            if (authData.user) {
+                // 2. Create entry in profiles table
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .upsert([
+                        {
+                            id: authData.user.id,
+                            email: data.email,
+                            name: '', // Initialize empty fields that might be required
+                        }
+                    ]);
+
+                if (profileError) {
+                    console.error("Profile creation error:", profileError);
+                    Alert.alert("Profile Error", "Account created but profile setup failed. Please contact support.");
+                } else {
+                    // Alert.alert("Success", "Profile created successfully");
+                    // Show custom success modal instead
+                    setShowSuccess(true);
+                }
+            }
+        } catch (error: any) {
+            Alert.alert("Error", error.message || "An unexpected error occurred");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleSuccessClose = () => {
+        setShowSuccess(false);
         router.push("/signup-wizard/step-1");
     };
 
@@ -121,13 +173,26 @@ export default function SignupEmail() {
 
                 {/* BUTTON */}
                 <TouchableOpacity
-                    style={styles.btn}
+                    style={[styles.btn, isLoading && styles.btnDisabled]}
                     onPress={handleSubmit(onSubmit)}
+                    disabled={isLoading}
                 >
-                    <Text style={styles.btnText}>Continue</Text>
+                    {isLoading ? (
+                        <ActivityIndicator color="#191A23" />
+                    ) : (
+                        <Text style={styles.btnText}>Continue</Text>
+                    )}
                 </TouchableOpacity>
 
             </View>
+
+            {/* Success Modal */}
+            <SuccessModal
+                visible={showSuccess}
+                onClose={handleSuccessClose}
+                title="You're In!"
+                subtitle="Your account has been successfully created. Let's build your profile."
+            />
         </PaperProvider>
     );
 }
@@ -246,6 +311,10 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         elevation: 4,
         marginTop: 10,
+    },
+    btnDisabled: {
+        opacity: 0.7,
+        backgroundColor: "#E0E0E0",
     },
 
     btnText: {
